@@ -1,0 +1,32 @@
+{
+  "name": "BaseballGame",
+  "version": "1.0.0",
+  "main": "main.js",
+  "author": "umeshu4488",
+  "license": "MIT",
+  "scripts": {
+    "gulp": "gulp",
+    "serve": "webpack --mode development --watch",
+    "build": "webpack --mode production"
+  },
+  "devDependencies": {
+    "babel-eslint": "^10.1.0",
+    "copy-webpack-plugin": "^9.0.0",
+    "eslint": "^7.27.0",
+    "eslint-cli": "^1.1.1",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^3.4.0",
+    "gulp": "^4.0.2",
+    "gulp-eslint": "^6.0.0",
+    "gulp-sass": "^4.1.0",
+    "gulp-webserver": "^0.9.1",
+    "prettier": "^2.3.0",
+    "webpack": "^5.37.1",
+    "webpack-cli": "^4.7.0",
+    "webpack-stream": "^6.1.2"
+  },
+  "dependencies": {
+    "dotenv-webpack": "^7.0.3",
+    "firebase": "^8.6.3"
+  }
+}
