@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8">
+        <title>満塁野球</title>
+        <link rel="icon" type="image/x-icon" href="./favicon.ico">
+        <link rel="stylesheet" href="./style/index.css?ver=1.0.0">
+        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1"
+            crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    </head>
+    <body>
+        <div id="app">
+            <!-- 開始時のモーダル -->
+            <div v-show="!isGameOpened" class="modal-root">
+                <div class="modal-container overflow-auto container">
+                    <!-- 初期表示用の野球画像 -->
+                    <div v-show="shouldShowInitImage" class="w-100 h-100">
+                        <img alt="top" class="w-100 h-25 modal-image" src="./image/topText.png">
+                        <img alt="top" class="w-100 h-75 modal-image" src="./image/top.png">
+                    </div>
+
+                    <!-- モード選択画面 -->
+                    <div v-show="isSelectingModeShownComputed">
+                        <!-- デバイスサイズの大きいものから見ていくため、sm以上は0の指定をしている -->
+                        <div class="row mb-2 mb-sm-0">
+                            <div classs="col text-shortten">{{ userMessageComputed }}</div>
+                        </div>
+
+                        <!-- ボタン -->
+                        <div class="row">
+                            <button class="col-sm col-12 mx-sm-2 mb-2 mb-sm-0"
+                                :title="guestButtonText"
+                                @click="onClickGuestStart">{{ guestButtonText }}</button>
+                            <button class="col-sm col-12 mx-sm-2 mb-2 mb-sm-0 text-shortten"
+                                :title="userStartButtonTextComputed"
+                                @click="onClickLogin">{{ userStartButtonTextComputed }}</button>
+                            <button v-show="loginUserName !== null" class="col-sm col-12 mx-sm-2 mb-2 mb-sm-0 text-shortten"
+                                :title="changeAccountButtonText"
+                                @click="onClickChangeAccount">{{ changeAccountButtonText }}</button>
+                        </div>
+
+                        <!-- ランキング -->
+                        <div class="row">
+                            <div v-for="(item, index) in rankings" class="col-sm col-xs-12 mx-0.5">
+                                <span>{{ item.titleText }}</span>
+                                <ul class="row list-group list-group-horizontal">
+                                    <li :class="`list-group-item-${item.themeColor}`"
+                                        class="col-lg-2 col-3 text-shortten">{{ item.headerTexts.rankingText }}</li>
+                                    <li :class="`list-group-item-${item.themeColor}`"
+                                        class="col-lg-4 col-9 text-shortten">{{ item.headerTexts.playerText }}</li>
+                                    <li :class="`list-group-item-${item.themeColor}`"
+                                        class="col-lg-2 col-3 text-shortten">{{ item.headerTexts.pointText }}</li>
+                                    <li :class="`list-group-item-${item.themeColor}`"
+                                        class="col-lg-4 col-9 text-shortten">{{ item.headerTexts.playDateText }}</li>
+                                </ul>
+                                <ul v-for="(data, index) in item.dataList" class="row list-group list-group-horizontal">
+                                    <li class="col-lg-2 col-3 list-group-item">{{ index + 1 }}</li>
+                                    <li class="col-lg-4 col-9 list-group-item text-shortten" :title="data.playerName">
+                                        <img v-show="data.playerIconImage !== undefined" class="w-25 rounded-circle" alt="player"
+                                            :src="data.playerIconImage">
+                                        <span>{{ data.playerName }}</span>
+                                    </li>
+                                    <li class="col-lg-2 col-3 list-group-item">
+                                        <span :class="`bg-${item.themeColor}`" class="badge rounded-pill">{{ data.point }}</span>
+                                    </li>
+                                    <li class="col-lg-4 col-9 list-group-item">
+                                        <span>{{ data.playDate }}</span>
+                                        <i v-show="data.isLoginUser"
+                                            title="削除"
+                                            class="bi bi-file-x pointer"
+                                            @click="onClickRecordDeleteButton(data)"
+                                        ></i>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 結果表示画面 -->
+                    <div v-show="shouldShowResult" class="row w-100">
+                        <div class="col-12 font-weight-bold h5 text-shortten">{{ userMessageComputed }}</div>
+                        <div class="col-12 font-weight-bold h5 my-3">{{ resultMessage }}</div>
+                        <button type="button"
+                            class="btn btn-outline-primary col-12 col-sm-3 mx-2"
+                            @click="onClickSaveButton"
+                        >{{ resultShowingButtonTexts.saveResultText }}</button>
+                        <button type="button"
+                            class="btn btn-outline-secondary col-12 col-sm-3 mx-2"
+                            @click="onClickRetryButton"
+                        >{{ resultShowingButtonTexts.retryText }}</button>
+                        <button type="button"
+                            class="btn btn-outline-secondary col-12 col-sm-3 mx-2"
+                            @click="onClickFinishButton"
+                        >{{ resultShowingButtonTexts.finishWithoutSaveText }}</button>
+                    </div>
+                </div>
+            </div>
+            <div v-show="!isGameOpened" class="modal-overlay"></div>
+
+            <!-- ボックス -->
+            <div class="point-box">
+                <!-- クラス名を処理内で使用しているため、クラス名を変更しない -->
+                <div class="point-item item-center"
+                    :style="`${boardItemStyleComputed} border-bottom-color: ${item.color};`"
+                    v-for="(item, index) in boardItems"
+                    :data-point="item.value.point"
+                    :data-out="item.value.out"
+                    :data-message="item.value.message"
+                    :key="index">
+                    {{ item.text }}
+                </div>
+            </div>
+
+            <!-- マウンド -->
+            <div class="item-center">
+                <img id="mound"
+                    class="moved-item-center"
+                    :style="moundStyleComputed"
+                    src="./image/mound.png"
+                />
+            </div>
+
+            <!-- ボール -->
+            <div class="item-center">
+                <img v-show="isBlankMessage"
+                    id="ball"
+                    class="moved-item-center"
+                    :style="ballStyleComputed"
+                    src="./image/ball.png"
+                />
+            </div>
+            <!-- バット -->
+            <div class="item-center">
+                <img id="bat"
+                    class="moved-item-center"
+                    :style="batStyleComputed"
+                    src="./image/bat.png"
+                />
+                <button v-show="isGameOpened"
+                    id="hitButton"
+                    class="moved-item-center btn btn-warning btn-lg"
+                    :style="hitButtonStyleComputed"
+                    @click="onClickHit"
+                >
+                    <span>{{ batSwingButtonText }}</span>
+                </button>
+            </div>
+
+            <!-- 1球ごとの結果 -->
+            <div class="item-center">
+                <span class="moved-item-center text-white font-weight-bold h4"
+                    :style="playingResultStyleComputed">{{ message }}</span>
+            </div>
+
+            <!-- 点数・アウトカウント -->
+            <div v-show="isGameOpened"
+                class="moved-item-center result-board"
+                :style="resultBoardStyleComputed"
+            >
+                <div class="item-center">{{ point }} {{ pointUnitText }}</div>
+                <div>
+                    <span>{{ strikeText }}</span>
+                    <span class="strike"
+                        v-for="index of strikeCount"
+                        :key="index"
+                    >●</span>
+                </div>
+                <div>
+                    <span>{{ outText }}</span>
+                    <span class="out"
+                        v-for="index of outCount"
+                        :key="index"
+                    >●</span>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript" src="main.js?ver=1.0.0"></script>
+    </body>
+</html>

@@ -1,0 +1,103 @@
+// 全体
+body {
+    // bootstrapの背景色が設定されないように
+    background-color: #158467 !important; // #4aa96c,387c6d,5aa469
+}
+
+// モーダル
+$modal-height: 80%;
+$ball-size: 40px;
+
+// モーダルを中央寄せにするために、モーダルの上にさらにスタイルをかけている
+.modal-root {
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    position: fixed;
+    z-index: 2;
+
+    .modal-container {
+        width: 70%;
+        height: $modal-height;
+        border: 2px solid #aaa;
+        background: rgb(238, 237, 237);
+        margin-top: $ball-size;
+        display: inline-block;
+        z-index: 2;
+
+        .modal-image {
+            object-fit: contain;
+            display: block;
+            margin: auto;
+        }
+    }
+}
+
+.modal-overlay {
+    width: 100%;
+    // スマホ対策
+    height: 120%;
+    background: rgba(94, 94, 94, 0.89);
+    top: 0;
+    left: 0;
+    z-index: 1;
+    position: fixed;
+}
+
+// 野球盤
+
+// 盤表示
+$board-item-side-empty-size: 20px;
+
+.point-box {
+    display: flex;
+    justify-content: space-between;
+
+    .point-item {
+        width: 150px;
+        border-left: $board-item-side-empty-size solid transparent;
+        border-right: $board-item-side-empty-size solid transparent;
+        height: 0;
+    }
+}
+
+// 結果表示欄
+.result-board {
+    background-color: white;
+    width: 78px;
+    height: 70px;
+
+    .strike {
+        color: #ffc93c;
+    }
+
+    .out {
+        color: #f55c47;
+    }
+}
+
+// 移動用（中央揃え）
+.moved-item-center {
+    position: absolute;
+    // 中央揃えの指定
+    left: 0;
+    right: 0;
+    margin: auto;
+}
+
+// utility
+
+.item-center {
+    text-align: center;
+}
+
+// 文字数が多い時の「...」表記
+.text-shortten {
+    overflow: hidden;
+    white-space: pre;
+    text-overflow: ellipsis;
+}
+
+.pointer {
+    cursor: pointer;
+}

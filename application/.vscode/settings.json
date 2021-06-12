@@ -1,0 +1,14 @@
+{
+    "eslint.validate": [
+        "javascript",
+        "typescript",
+    ],
+    // VSCodeの保存時の自動整形を無効（拡張機能のESLintの自動整形と競合しないようにするため）
+    "editor.formatOnSave": false,
+    // ESLintの保存時の自動整形を有効化
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    // 保存時に自動で不要な空白文字を削除
+    "files.trimTrailingWhitespace": true
+}
