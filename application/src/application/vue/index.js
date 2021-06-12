@@ -111,16 +111,7 @@ export const createVueInstance = () => {
       },
       // 画面側で使用しており、asyncとすると表示が上手くいかないため同期メソッドとしている
       isSelectingModeShownComputed() {
-        const isSelectingModeShown = !(
-          this.shouldShowInitImage || this.shouldShowResult
-        );
-        if (!this.isGameOpened && isSelectingModeShown) {
-          // トップメニューを表示するときはランキングなどのトップメニュー用のデータを初期化
-          // TODO:初期表示時は画像表示中にランキング取得するため、呼び出しを防ぎたい（不要なクエリ発行は料金がかかる元となるため）
-          this.initializeTopMenuData();
-        }
-
-        return isSelectingModeShown;
+        return !(this.shouldShowInitImage || this.shouldShowResult);
       },
     },
     data: {
@@ -320,6 +311,7 @@ export const createVueInstance = () => {
         }
 
         this.shouldShowResult = false;
+        this.initializeTopMenuData();
       },
       /**
        * 「保存せずにリトライ」ボタン押下処理
@@ -333,6 +325,7 @@ export const createVueInstance = () => {
        */
       onClickFinishButton() {
         this.shouldShowResult = false;
+        this.initializeTopMenuData();
       },
 
       /**
