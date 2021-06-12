@@ -263,7 +263,7 @@ export const createVueInstance = () => {
        */
       async onClickRecordDeleteButton(recordItem) {
         const shouldDelete = window.confirm(
-          `記録を削除しますか。\n得点${recordItem.point}\nプレイ日：${recordItem.playDate}`,
+          `記録を削除しますか。\n得点：${recordItem.point}\nプレイ日：${recordItem.playDate}`,
         );
         if (shouldDelete) {
           await FireStoreExtention.loginUserStore.deleteRanking(

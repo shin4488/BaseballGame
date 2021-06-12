@@ -5,32 +5,33 @@ const webpack = require('webpack');
 const webpackStream = require('webpack-stream');
 const webpackConfig = require('./webpack.config');
 const webserver = require('gulp-webserver');
-var sass = require('gulp-sass');
+const sass = require('gulp-sass');
+const mode = require('gulp-mode')({
+  modes: ['production', 'development'],
+  default: 'development',
+  verbose: false,
+});
 
-const distPath = path.resolve(__dirname, 'dist');
+const isDevelopment = mode.development();
+const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
 const srcPath = path.resolve(__dirname, 'src');
-
-// 監視タスク
-const watchTask = (done) => {
-  watch('./src/**', series(lint, bundleDev, sassTask));
-  done();
-};
 
 // ブラウザ起動
 const brawserTask = (done) => {
   // アイコンファイルをdistに配置
-  src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(distPath));
+  src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(outputPath));
   // 画像フォルダをdistに配置
   src(path.resolve(srcPath, 'image/**')).pipe(
-    dest(path.resolve(distPath, 'image')),
+    dest(path.resolve(outputPath, 'image')),
   );
-  src(distPath, { allowEmpty: true }).pipe(
+  src(outputPath, { allowEmpty: true }).pipe(
     webserver({
       port: 4000,
       livereload: true,
       open: true,
     }),
   );
+
   done();
 };
 
@@ -38,13 +39,13 @@ const brawserTask = (done) => {
 const sassTask = (done) => {
   src('./src/style/*.scss')
     .pipe(sass.sync())
-    .pipe(dest(path.resolve(distPath, 'style')));
+    .pipe(dest(path.resolve(outputPath, 'style')));
   done();
 };
 
 // eslint適用
 const lint = (done) => {
-  src(['**/*.js', '!node_modules/**'])
+  src(['**/*.js', '!node_modules/**', '!dist/**', '!publish/**'])
     .pipe(eslint({ useEslintrc: true }))
     .pipe(eslint.format())
     .pipe(eslint.failAfterError())
@@ -53,25 +54,24 @@ const lint = (done) => {
 };
 
 // webpack呼び出し
-const bundleDev = (done) => {
+const bundle = (done) => {
   // webpackconfigに引数を渡す必要がある
   webpackStream(
-    webpackConfig(undefined, { mode: 'development' }),
+    webpackConfig(undefined, {
+      mode: isDevelopment ? 'development' : 'production',
+    }),
     webpack,
-  ).pipe(dest(distPath));
+  ).pipe(dest(outputPath));
   done();
 };
 
-// webpack呼び出し
-const bundleProd = (done) => {
-  // webpackconfigに引数を渡す必要がある
-  webpackStream(webpackConfig(undefined, { mode: 'production' }), webpack).pipe(
-    dest(distPath),
-  );
+// 監視タスク
+const watchTask = (done) => {
+  watch('./src/**', series(lint, bundle, sassTask));
   done();
 };
 
-exports.build = series(lint, bundleProd, sassTask);
+exports.build = series(lint, bundle, sassTask, brawserTask);
 
 // gulpコマンド実行時
-exports.default = series(lint, bundleDev, sassTask, brawserTask, watchTask);
+exports.default = series(lint, bundle, sassTask, brawserTask, watchTask);
