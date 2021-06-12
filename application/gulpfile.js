@@ -24,13 +24,15 @@ const brawserTask = (done) => {
   src(path.resolve(srcPath, 'image/**')).pipe(
     dest(path.resolve(outputPath, 'image')),
   );
-  src(outputPath, { allowEmpty: true }).pipe(
-    webserver({
-      port: 4000,
-      livereload: true,
-      open: true,
-    }),
-  );
+  if (isDevelopment) {
+    src(outputPath, { allowEmpty: true }).pipe(
+      webserver({
+        port: 4000,
+        livereload: true,
+        open: true,
+      }),
+    );
+  }
 
   done();
 };

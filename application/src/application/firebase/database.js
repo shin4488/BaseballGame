@@ -35,6 +35,10 @@ export class FireStore {
         .collection(this._collection)
         .orderBy(FireStoreColumn.point, 'desc')
         .get();
+      if (topRanking.docs.length === 0) {
+        return [];
+      }
+
       const topRankingPoint = topRanking.docs[0].data()[FireStoreColumn.point];
       const basisDate = new Date();
       basisDate.setDate(basisDate.getDate() - 7);
@@ -47,11 +51,12 @@ export class FireStore {
         .orderBy(FireStoreColumn.point, 'desc')
         .startAt(basisDate, topRankingPoint)
         .get();
+
       return guests.docs
         .map((x) => x.data())
         .filter((x) => x[FireStoreColumn.point] >= 0);
     } catch (error) {
-      throw new Error('Ranking Fetch Error');
+      throw new Error('Ranking Fetch Error1');
     }
   }
 
@@ -67,9 +72,10 @@ export class FireStore {
         .orderBy(FireStoreColumn.lastUpdated)
         .limit(10)
         .get();
+
       return guests.docs.map((x) => x.data());
     } catch (error) {
-      throw new Error('Ranking Fetch Error');
+      throw new Error('Ranking Fetch Error2');
     }
   }
 
