@@ -16,15 +16,21 @@ const isDevelopment = mode.development();
 const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
 const srcPath = path.resolve(__dirname, 'src');
 
-// ブラウザ起動
-const brawserTask = (done) => {
+// ファイルコピー
+const copyFile = (done) => {
+  src(path.resolve(srcPath, 'index.html')).pipe(dest(outputPath));
   // アイコンファイルをdistに配置
   src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(outputPath));
   // 画像フォルダをdistに配置
   src(path.resolve(srcPath, 'image/**')).pipe(
     dest(path.resolve(outputPath, 'image')),
   );
-  if (isDevelopment) {
+  done();
+};
+
+// ブラウザ起動
+const brawserTask = (done) => {
+  setTimeout(() => {
     src(outputPath, { allowEmpty: true }).pipe(
       webserver({
         port: 4000,
@@ -32,9 +38,9 @@ const brawserTask = (done) => {
         open: true,
       }),
     );
-  }
 
-  done();
+    done();
+  }, 1000);
 };
 
 // sass
@@ -73,7 +79,14 @@ const watchTask = (done) => {
   done();
 };
 
-exports.build = series(lint, bundle, sassTask, brawserTask);
+exports.build = series(lint, bundle, sassTask, copyFile);
 
 // gulpコマンド実行時
-exports.default = series(lint, bundle, sassTask, brawserTask, watchTask);
+exports.default = series(
+  lint,
+  bundle,
+  sassTask,
+  copyFile,
+  brawserTask,
+  watchTask,
+);
