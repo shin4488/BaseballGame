@@ -21,6 +21,29 @@ module.exports = (env, argv) => {
       maxAssetSize: 1000000,
       maxEntrypointSize: 1000000,
     },
+    module: {
+      rules: [
+        {
+          test: /\.js$/,
+          exclude: {
+            and: [/node_modules/, /dist/, /publish/, /1.0.*/],
+          },
+          use: {
+            // Android端末などではimportが使用できないため、Babelで変換
+            loader: 'babel-loader',
+            options: {
+              presets: [
+                // プリセットを指定することで、ES2020をES5に変換
+                '@babel/preset-env',
+                {
+                  compact: false,
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
     plugins: [
       new CopyWebpackPlugin({
         patterns: [
