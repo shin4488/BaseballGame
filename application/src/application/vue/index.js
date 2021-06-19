@@ -7,6 +7,7 @@ import {
   getRandomNumber,
 } from './process';
 import { boardItems, guestImagePath } from './appConfig';
+import 'regenerator-runtime/runtime.js';
 
 export const createVueInstance = () => {
   return new Vue({
@@ -392,6 +393,7 @@ export const createVueInstance = () => {
         const baseballGame = setInterval(async () => {
           // 1球投げる
           await this.throwBall();
+
           this.clearThrowingBall();
 
           if (this.outCount >= 3) {
