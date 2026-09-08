@@ -6,7 +6,7 @@
 
 - ビルド設定は `application/package.json`・`gulpfile.js`・`webpack.config.js`、配信は `web/` と `docker-compose.yaml`。依存・出力先・接続設定は元の定義を確認する。
 - `application/` で `yarn gulp` が開発用のビルド・監視、`yarn gulp:build` が本番用のlint・バンドル・スタイル生成。JavaScriptのバンドルだけなら `yarn webpack:build`。変更した部分に必要なビルドとブラウザ確認を行う。
-- Node 24で `yarn gulp:build` の後に `yarn test` を実行する。テストは得点の境界値・乱数・当たり判定・配信ファイルを確認する。lintエラーはビルド失敗として扱う。スタイル生成には公式Dart Sassを使う。
+- Node 24で `yarn gulp:build` の後に `yarn test` を実行する。テストは得点の境界値・乱数・当たり判定・配信ファイルと、Firebase認証・ランキング・保存の契約を確認する。lintエラーはビルド失敗として扱う。スタイル生成には公式Dart Sassを使う。開発サーバーはWebpack公式のwebpack-dev-server、Firebaseはmodular APIを使用する。`dev-server.cjs` がポート4000・ライブリロード・ブラウザ起動とディスクへのバンドル出力を設定する。
 - `application/.env` の値・認証情報をログや文書に転記しない。Firebaseの認証・保存を伴う確認では接続先と書込対象を確認し、実データへの操作を単なるビルド確認に含めない。
 - ソースを編集し、`dist/`・`publish/` の生成物を直接修正しない。Composeは配信用で、アプリの依存インストールやビルドの代わりにはならない。
 

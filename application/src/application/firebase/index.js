@@ -1,5 +1,5 @@
-import firebase from 'firebase/app';
-import 'firebase/analytics';
+import { initializeApp } from 'firebase/app';
+import { getAnalytics } from 'firebase/analytics';
 import { FirebaseAuthExtention } from './auth';
 import { FireStoreExtention } from './database';
 
@@ -17,8 +17,8 @@ export class FirebaseInit {
       appId: process.env.FIREBASE_APP_ID,
       measurementId: process.env.FIREBASE_MEASUREMENT_ID,
     };
-    firebase.initializeApp(firebaseConfig);
-    firebase.analytics();
+    const app = initializeApp(firebaseConfig);
+    getAnalytics(app);
 
     await FirebaseAuthExtention.init();
     FireStoreExtention.init();

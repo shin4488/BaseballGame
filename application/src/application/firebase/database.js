@@ -1,5 +1,16 @@
-import firebase from 'firebase/app';
-import 'firebase/firestore';
+import {
+  initializeFirestore,
+  collection,
+  query,
+  orderBy,
+  startAt,
+  limit,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+} from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 
 /**
  * firestoreのランキングコレクションのカラム
@@ -31,10 +42,12 @@ export class FireStore {
    */
   async getRankingThisWeek() {
     try {
-      const topRanking = await this._firestore
-        .collection(this._collection)
-        .orderBy(FireStoreColumn.point, 'desc')
-        .get();
+      const topRanking = await getDocs(
+        query(
+          collection(this._firestore, this._collection),
+          orderBy(FireStoreColumn.point, 'desc'),
+        ),
+      );
       if (topRanking.docs.length === 0) {
         return [];
       }
@@ -45,12 +58,14 @@ export class FireStore {
 
       // startAtで(得点, 日付)の順で指定すると想定通りの挙動をしないため、(日付, 得点)の順で指定している
       // 日付順を得点順より優先してしまっているため、limitを付けると日付が最近でランキング上位者が取得されなくなる
-      const guests = await this._firestore
-        .collection(this._collection)
-        .orderBy(FireStoreColumn.lastUpdated)
-        .orderBy(FireStoreColumn.point, 'desc')
-        .startAt(basisDate, topRankingPoint)
-        .get();
+      const guests = await getDocs(
+        query(
+          collection(this._firestore, this._collection),
+          orderBy(FireStoreColumn.lastUpdated),
+          orderBy(FireStoreColumn.point, 'desc'),
+          startAt(basisDate, topRankingPoint),
+        ),
+      );
 
       return guests.docs
         .map((x) => x.data())
@@ -66,12 +81,14 @@ export class FireStore {
    */
   async getRankingHistory() {
     try {
-      const guests = await this._firestore
-        .collection(this._collection)
-        .orderBy(FireStoreColumn.point, 'desc')
-        .orderBy(FireStoreColumn.lastUpdated)
-        .limit(10)
-        .get();
+      const guests = await getDocs(
+        query(
+          collection(this._firestore, this._collection),
+          orderBy(FireStoreColumn.point, 'desc'),
+          orderBy(FireStoreColumn.lastUpdated),
+          limit(10),
+        ),
+      );
 
       return guests.docs.map((x) => x.data());
     } catch (error) {
@@ -91,7 +108,7 @@ export class FireStore {
 
       // ゲストユーザのユーザIDを生成
       const guestCount = (
-        await this._firestore.collection(this._collection).get()
+        await getDocs(collection(this._firestore, this._collection))
       ).size;
       const guestCountWithPadding = `${zeros.join('')}${guestCount + 1}`.slice(
         -randomSize,
@@ -126,10 +143,11 @@ export class FireStore {
     };
 
     // 本来同じユーザの歴代記録は残したいところだが、自分が何度もプレーしているのがばれたくないため記録は上書きする
-    await this._firestore
-      .collection(this._collection)
-      .doc(documentId)
-      .set(targetData, { merge: true });
+    await setDoc(
+      doc(this._firestore, this._collection, documentId),
+      targetData,
+      { merge: true },
+    );
   }
 
   /**
@@ -137,7 +155,7 @@ export class FireStore {
    * @param {*} documentId
    */
   async deleteRanking(documentId) {
-    await this._firestore.collection(this._collection).doc(documentId).delete();
+    await deleteDoc(doc(this._firestore, this._collection, documentId));
   }
 }
 
@@ -149,10 +167,8 @@ export class FireStoreExtention {
   static guestStore;
 
   static init() {
-    const firestore = firebase.firestore();
-    firestore.settings({
+    const firestore = initializeFirestore(getApp(), {
       ignoreUndefinedProperties: true,
-      merge: true,
     });
     FireStoreExtention.guestStore = new FireStore(firestore, 'guests');
     FireStoreExtention.loginUserStore = new FireStore(firestore, 'loginUsers');

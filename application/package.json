@@ -26,17 +26,17 @@
     "gulp": "5.0.1",
     "gulp-mode": "^1.1.0",
     "gulp-sass": "6.0.1",
-    "gulp-webserver": "^0.9.1",
     "prettier": "^2.3.0",
     "regenerator-runtime": "^0.13.7",
     "webpack": "^5.37.1",
     "webpack-cli": "^4.7.0",
     "webpack-stream": "7.0.0",
-    "sass": "1.104.0"
+    "sass": "1.104.0",
+    "webpack-dev-server": "6.0.0"
   },
   "dependencies": {
     "dotenv-webpack": "^7.0.3",
-    "firebase": "^8.6.3"
+    "firebase": "12.18.0"
   },
   "engines": {
     "node": "24.x"

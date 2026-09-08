@@ -1,87 +1,76 @@
-const path = require("path");
-const { series, dest, src, watch } = require("gulp");
-const { ESLint } = require("eslint");
-const webpack = require("webpack");
-const webpackStream = require("webpack-stream");
-const webpackConfig = require("./webpack.config");
-const webserver = require("gulp-webserver");
-const sass = require("gulp-sass")(require("sass"));
-const mode = require("gulp-mode")({
-  modes: ["production", "development"],
-  default: "development",
+const path = require('path');
+const { series, dest, src, watch } = require('gulp');
+const { ESLint } = require('eslint');
+const webpack = require('webpack');
+const webpackStream = require('webpack-stream');
+const webpackConfig = require('./webpack.config');
+const { finished } = require('node:stream/promises');
+const sass = require('gulp-sass')(require('sass'));
+const mode = require('gulp-mode')({
+  modes: ['production', 'development'],
+  default: 'development',
   verbose: false,
 });
 
 const isDevelopment = mode.development();
-const outputPath = path.resolve(__dirname, isDevelopment ? "dist" : "publish");
-const srcPath = path.resolve(__dirname, "src");
+const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
+const srcPath = path.resolve(__dirname, 'src');
 
-// ブラウザ起動
-const brawserTask = (done) => {
-  // アイコンファイルをdistに配置
-  src(path.resolve(srcPath, "image", "favicon.ico")).pipe(dest(outputPath));
-  // 画像フォルダをdistに配置
-  src(path.resolve(srcPath, "image/**")).pipe(
-    dest(path.resolve(outputPath, "image"))
-  );
-  if (isDevelopment) {
-    src(outputPath, { allowEmpty: true }).pipe(
-      webserver({
-        port: 4000,
-        livereload: true,
-        open: true,
-      })
-    );
-  }
-
-  done();
+// 配信ファイルの書き込み完了を待ち、ビルド途中の成果物を公開しない。
+const copyAssets = async () => {
+  await Promise.all([
+    finished(
+      src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(outputPath)),
+    ),
+    finished(
+      src(path.resolve(srcPath, 'image/**')).pipe(
+        dest(path.resolve(outputPath, 'image')),
+      ),
+    ),
+  ]);
 };
 
-// sass
-const sassTask = (done) => {
-  src("./src/style/*.scss")
+const sassTask = () =>
+  src('./src/style/*.scss')
     .pipe(sass.sync())
-    .pipe(dest(path.resolve(outputPath, "style")));
-  done();
-};
+    .pipe(dest(path.resolve(outputPath, 'style')));
 
 // eslint適用
 const lint = async () => {
   const eslint = new ESLint({
     overrideConfig: {
-      ignorePatterns: ["node_modules/**", "dist/**", "publish/**"],
+      ignorePatterns: ['node_modules/**', 'dist/**', 'publish/**'],
     },
   });
-  const results = await eslint.lintFiles(["**/*.js"]);
-  const formatter = await eslint.loadFormatter("stylish");
+  const results = await eslint.lintFiles(['**/*.js']);
+  const formatter = await eslint.loadFormatter('stylish');
   const output = formatter.format(results);
   if (output) {
     process.stdout.write(output);
   }
   if (results.some((result) => result.errorCount > 0)) {
-    throw new Error("JavaScript lint failed");
+    throw new Error('JavaScript lint failed');
   }
 };
 
 // webpack呼び出し
-const bundle = (done) => {
-  // webpackconfigに引数を渡す必要がある
+const bundle = () =>
   webpackStream(
     webpackConfig(undefined, {
-      mode: isDevelopment ? "development" : "production",
+      mode: isDevelopment ? 'development' : 'production',
     }),
-    webpack
+    webpack,
   ).pipe(dest(outputPath));
-  done();
+
+const startDevServer = async () => {
+  const { createDevServer } = require('./dev-server.cjs');
+  const server = createDevServer();
+  await server.start();
+  // JSはWebpack、画像とSCSSはGulpで監視する。HTML/画像/CSSの変更もライブリロードする。
+  watch('./src/**/*.js', lint);
+  watch('./src/style/**', sassTask);
+  watch('./src/image/**', copyAssets);
 };
 
-// 監視タスク
-const watchTask = (done) => {
-  watch("./src/**", series(lint, bundle, sassTask));
-  done();
-};
-
-exports.build = series(lint, bundle, sassTask, brawserTask);
-
-// gulpコマンド実行時
-exports.default = series(lint, bundle, sassTask, brawserTask, watchTask);
+exports.build = series(lint, bundle, sassTask, copyAssets);
+exports.default = series(lint, sassTask, copyAssets, startDevServer);
