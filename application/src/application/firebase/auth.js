@@ -1,5 +1,10 @@
-import firebase from 'firebase/app';
-import 'firebase/auth';
+import {
+  getAuth,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import 'regenerator-runtime/runtime.js';
 
 /**
@@ -12,7 +17,7 @@ export class FirebaseAuth {
    */
   async watchStateChanged() {
     return new window.Promise((resolve) => {
-      firebase.auth().onAuthStateChanged((user) => {
+      onAuthStateChanged(getAuth(), (user) => {
         if (user === null) {
           this.clear();
           resolve();
@@ -31,10 +36,10 @@ export class FirebaseAuth {
    * Googleログイン処理
    */
   async signInWithPopupToGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
+    const provider = new GoogleAuthProvider();
 
     try {
-      const loginUserData = await firebase.auth().signInWithPopup(provider);
+      const loginUserData = await signInWithPopup(getAuth(), provider);
       this._loginUserId = loginUserData.user.uid;
       this._loginUserName = loginUserData.user.displayName;
       this._loginUserIconImage = loginUserData.user.photoURL;
@@ -47,7 +52,7 @@ export class FirebaseAuth {
    * ログアウト処理
    */
   async signOutFromGoogle() {
-    await firebase.auth().signOut();
+    await signOut(getAuth());
   }
 
   getLoginUserId() {

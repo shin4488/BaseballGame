@@ -8,7 +8,8 @@
     "gulp": "gulp",
     "gulp:build": "gulp build --production",
     "serve": "webpack --mode development --watch",
-    "webpack:build": "webpack --mode production"
+    "webpack:build": "webpack --mode production",
+    "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {
     "@babel/core": "^7.14.5",
@@ -16,25 +17,28 @@
     "babel-eslint": "^10.1.0",
     "babel-loader": "^8.2.2",
     "babel-plugin-transform-runtime": "^6.23.0",
-    "copy-webpack-plugin": "^9.0.0",
+    "copy-webpack-plugin": "14.0.0",
     "core-js": "3",
     "eslint": "^7.27.0",
     "eslint-cli": "^1.1.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-prettier": "^3.4.0",
-    "gulp": "^4.0.2",
-    "gulp-eslint": "^6.0.0",
+    "gulp": "5.0.1",
     "gulp-mode": "^1.1.0",
-    "gulp-sass": "^4.1.0",
-    "gulp-webserver": "^0.9.1",
+    "gulp-sass": "6.0.1",
     "prettier": "^2.3.0",
     "regenerator-runtime": "^0.13.7",
     "webpack": "^5.37.1",
     "webpack-cli": "^4.7.0",
-    "webpack-stream": "^6.1.2"
+    "webpack-stream": "7.0.0",
+    "sass": "1.104.0",
+    "webpack-dev-server": "6.0.0"
   },
   "dependencies": {
     "dotenv-webpack": "^7.0.3",
-    "firebase": "^8.6.3"
+    "firebase": "12.18.0"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
