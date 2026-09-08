@@ -1,28 +1,28 @@
-const path = require('path');
-const { series, dest, src, watch } = require('gulp');
-const eslint = require('gulp-eslint');
-const webpack = require('webpack');
-const webpackStream = require('webpack-stream');
-const webpackConfig = require('./webpack.config');
-const webserver = require('gulp-webserver');
-const sass = require('gulp-sass');
-const mode = require('gulp-mode')({
-  modes: ['production', 'development'],
-  default: 'development',
+const path = require("path");
+const { series, dest, src, watch } = require("gulp");
+const { ESLint } = require("eslint");
+const webpack = require("webpack");
+const webpackStream = require("webpack-stream");
+const webpackConfig = require("./webpack.config");
+const webserver = require("gulp-webserver");
+const sass = require("gulp-sass")(require("sass"));
+const mode = require("gulp-mode")({
+  modes: ["production", "development"],
+  default: "development",
   verbose: false,
 });
 
 const isDevelopment = mode.development();
-const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
-const srcPath = path.resolve(__dirname, 'src');
+const outputPath = path.resolve(__dirname, isDevelopment ? "dist" : "publish");
+const srcPath = path.resolve(__dirname, "src");
 
 // ブラウザ起動
 const brawserTask = (done) => {
   // アイコンファイルをdistに配置
-  src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(outputPath));
+  src(path.resolve(srcPath, "image", "favicon.ico")).pipe(dest(outputPath));
   // 画像フォルダをdistに配置
-  src(path.resolve(srcPath, 'image/**')).pipe(
-    dest(path.resolve(outputPath, 'image')),
+  src(path.resolve(srcPath, "image/**")).pipe(
+    dest(path.resolve(outputPath, "image"))
   );
   if (isDevelopment) {
     src(outputPath, { allowEmpty: true }).pipe(
@@ -30,7 +30,7 @@ const brawserTask = (done) => {
         port: 4000,
         livereload: true,
         open: true,
-      }),
+      })
     );
   }
 
@@ -39,20 +39,28 @@ const brawserTask = (done) => {
 
 // sass
 const sassTask = (done) => {
-  src('./src/style/*.scss')
+  src("./src/style/*.scss")
     .pipe(sass.sync())
-    .pipe(dest(path.resolve(outputPath, 'style')));
+    .pipe(dest(path.resolve(outputPath, "style")));
   done();
 };
 
 // eslint適用
-const lint = (done) => {
-  src(['**/*.js', '!node_modules/**', '!dist/**', '!publish/**'])
-    .pipe(eslint({ useEslintrc: true }))
-    .pipe(eslint.format())
-    .pipe(eslint.failAfterError())
-    .on('error', () => {});
-  done();
+const lint = async () => {
+  const eslint = new ESLint({
+    overrideConfig: {
+      ignorePatterns: ["node_modules/**", "dist/**", "publish/**"],
+    },
+  });
+  const results = await eslint.lintFiles(["**/*.js"]);
+  const formatter = await eslint.loadFormatter("stylish");
+  const output = formatter.format(results);
+  if (output) {
+    process.stdout.write(output);
+  }
+  if (results.some((result) => result.errorCount > 0)) {
+    throw new Error("JavaScript lint failed");
+  }
 };
 
 // webpack呼び出し
@@ -60,16 +68,16 @@ const bundle = (done) => {
   // webpackconfigに引数を渡す必要がある
   webpackStream(
     webpackConfig(undefined, {
-      mode: isDevelopment ? 'development' : 'production',
+      mode: isDevelopment ? "development" : "production",
     }),
-    webpack,
+    webpack
   ).pipe(dest(outputPath));
   done();
 };
 
 // 監視タスク
 const watchTask = (done) => {
-  watch('./src/**', series(lint, bundle, sassTask));
+  watch("./src/**", series(lint, bundle, sassTask));
   done();
 };
 
