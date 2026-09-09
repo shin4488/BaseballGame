@@ -16,15 +16,17 @@ const isDevelopment = mode.development();
 const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
 const srcPath = path.resolve(__dirname, 'src');
 
-// 配信ファイルの書き込み完了を待ち、ビルド途中の成果物を公開しない。
+// 画像は文字コード変換せずにコピーし、全ファイルの書き込み完了を待つ。
 const copyAssets = async () => {
   await Promise.all([
     finished(
-      src(path.resolve(srcPath, 'image', 'favicon.ico')).pipe(dest(outputPath)),
+      src(path.resolve(srcPath, 'image', 'favicon.ico'), {
+        encoding: false,
+      }).pipe(dest(outputPath, { encoding: false })),
     ),
     finished(
-      src(path.resolve(srcPath, 'image/**')).pipe(
-        dest(path.resolve(outputPath, 'image')),
+      src(path.resolve(srcPath, 'image/**'), { encoding: false }).pipe(
+        dest(path.resolve(outputPath, 'image'), { encoding: false }),
       ),
     ),
   ]);

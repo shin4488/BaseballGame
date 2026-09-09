@@ -88,3 +88,20 @@ test("ビルド後にもゲームの入口・画像・スタイルが配信さ�
   assert.match(html, /main\.js/);
   assert.match(html, /style\/index\.css/);
 });
+
+// 画像は加工せず配信する。存在確認だけでは文字コード変換による破損を検出できない。
+test("配信する全画像とfaviconは元ファイルのバイナリを保持する", () => {
+  for (const file of fs.readdirSync("src/image", { recursive: true })) {
+    const source = `src/image/${file}`;
+    if (!fs.statSync(source).isFile()) continue;
+    assert.ok(
+      fs.readFileSync(`publish/image/${file}`).equals(fs.readFileSync(source)),
+      `image/${file} must match the source bytes`
+    );
+  }
+  assert.ok(
+    fs.readFileSync("publish/favicon.ico")
+      .equals(fs.readFileSync("src/image/favicon.ico")),
+    "favicon.ico must match the source bytes"
+  );
+});
