@@ -121,7 +121,7 @@ export class FireStore {
 
       // 一時的にゲストユーザドキュメントを生成
       // 他のユーザとゲストユーザのユーザIDの重複を防ぐため
-      this.upsertRanking({
+      await this.upsertRanking({
         documentId: `${guestCountWithPadding}${randomString}`,
       });
 
