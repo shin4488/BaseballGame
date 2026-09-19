@@ -2,7 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const babel = require('@babel/core');
-function load(file, dependencies, browserCrypto = globalThis.crypto) {
+function load(
+  file,
+  dependencies,
+  browserCrypto = globalThis.crypto,
+  globals = {},
+) {
   const exports = {};
   const code = babel.transformFileSync(file, {
     presets: ['@babel/preset-env'],
@@ -14,6 +19,7 @@ function load(file, dependencies, browserCrypto = globalThis.crypto) {
     Date,
     Math,
     window: { Promise, crypto: browserCrypto },
+    ...globals,
     require: (name) => {
       assert.ok(name in dependencies, name);
       return dependencies[name];
@@ -64,6 +70,7 @@ function database(browserCrypto) {
   );
   return {
     ...exported,
+    sdk,
     store: new exported.FireStore('database', 'guests'),
     reads,
     writes,
@@ -103,6 +110,128 @@ test('安全な乱数が使えない場合はIDを保存しない', async () => 
     message: 'Create Id Error',
   });
   assert.equal(d.writes.length, 0);
+});
+
+test('ゲストIDは保存が完了するまで返さない', async () => {
+  const d = database();
+  d.snapshots.push(d.snapshot([]));
+  let finishWrite;
+  d.sdk.setDoc = () =>
+    new Promise((resolve) => {
+      finishWrite = resolve;
+    });
+  let completed = false;
+  const creating = d.store.createUserId().then((id) => {
+    completed = true;
+    return id;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  finishWrite();
+  const id = await creating;
+  assert.match(id.randomString, /^[0-9a-f]{32}$/);
+});
+
+test('ゲストIDの保存失敗は呼び出し元に伝える', async () => {
+  const d = database();
+  d.snapshots.push(d.snapshot([]));
+  d.sdk.setDoc = async () => {
+    throw new Error('permission-denied');
+  };
+  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
+});
+
+test('読み取り失敗時には乱数生成も保存も行わない', async () => {
+  let randomCalled = false;
+  const d = database({
+    getRandomValues: () => {
+      randomCalled = true;
+    },
+  });
+  d.snapshots.push(new Error('offline'));
+  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
+  assert.equal(randomCalled, false);
+  assert.equal(d.writes.length, 0);
+});
+
+test('同じ件数を読んだ同時作成でも異なるIDを保存する', async () => {
+  let sequence = 0;
+  const d = database({ getRandomValues: (bytes) => bytes.fill(sequence++) });
+  d.snapshots.push(d.snapshot([]), d.snapshot([]));
+  const ids = await Promise.all([
+    d.store.createUserId(),
+    d.store.createUserId(),
+  ]);
+  assert.equal(ids[0].guestCountWithPadding, ids[1].guestCountWithPadding);
+  assert.equal(ids[0].randomString, '00'.repeat(16));
+  assert.equal(ids[1].randomString, '01'.repeat(16));
+  assert.notEqual(d.writes[0].ref.id, d.writes[1].ref.id);
+});
+
+function guestScreen(store) {
+  const { createVueInstance } = load(
+    'src/application/vue/index.js',
+    {
+      '../vector/vector2': {},
+      '../firebase/auth': {
+        FirebaseAuthExtention: { auth: { signOutFromGoogle: async () => {} } },
+      },
+      '../firebase/database': { FireStoreExtention: { guestStore: store } },
+      './process': {},
+      './appConfig': { boardItems: [], guestImagePath: 'guest.png' },
+      'regenerator-runtime/runtime.js': {},
+    },
+    undefined,
+    {
+      Vue: function (options) {
+        return options;
+      },
+    },
+  );
+  const options = createVueInstance();
+  let started = false;
+  return {
+    ...options.data,
+    ...options.methods,
+    executeBaseballGame: () => {
+      started = true;
+    },
+    hasStarted: () => started,
+  };
+}
+
+test('画面は42文字のゲストIDを保持し、保存完了後にゲームを始める', async () => {
+  const d = database({ getRandomValues: (bytes) => bytes.fill(255) });
+  d.snapshots.push(d.snapshot([]));
+  let finishWrite;
+  d.sdk.setDoc = () =>
+    new Promise((resolve) => {
+      finishWrite = resolve;
+    });
+  const screen = guestScreen(d.store);
+  const starting = screen.onClickGuestStart();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(screen.hasStarted(), false);
+  assert.equal(screen.guestUserId, null);
+  finishWrite();
+  await starting;
+  assert.equal(screen.guestUserId, `0000000001${'ff'.repeat(16)}`);
+  assert.equal(screen.guestNumber, 1);
+  assert.equal(screen.hasStarted(), true);
+});
+
+test('画面はゲスト保存失敗時にIDを設定せずゲームを始めない', async () => {
+  const d = database();
+  d.snapshots.push(d.snapshot([]));
+  d.sdk.setDoc = async () => {
+    throw new Error('offline');
+  };
+  const screen = guestScreen(d.store);
+  await assert.rejects(screen.onClickGuestStart(), {
+    message: 'Create Id Error',
+  });
+  assert.equal(screen.guestUserId, null);
+  assert.equal(screen.hasStarted(), false);
 });
 
 test('歴代ランキングは得点降順・日時昇順の上位10件を要求する', async () => {
