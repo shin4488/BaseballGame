@@ -113,7 +113,11 @@ export class FireStore {
       const guestCountWithPadding = `${zeros.join('')}${guestCount + 1}`.slice(
         -randomSize,
       );
-      const randomString = Math.random().toString(36).slice(-randomSize);
+      // ゲストIDを推測しにくくするため、ブラウザの暗号学的乱数を使う。
+      const randomBytes = window.crypto.getRandomValues(new Uint8Array(16));
+      const randomString = Array.from(randomBytes, (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
 
       // 一時的にゲストユーザドキュメントを生成
       // 他のユーザとゲストユーザのユーザIDの重複を防ぐため

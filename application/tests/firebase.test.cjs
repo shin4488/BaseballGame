@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const babel = require('@babel/core');
-function load(file, dependencies) {
+function load(file, dependencies, browserCrypto = globalThis.crypto) {
   const exports = {};
   const code = babel.transformFileSync(file, {
     presets: ['@babel/preset-env'],
@@ -13,7 +13,7 @@ function load(file, dependencies) {
     exports,
     Date,
     Math,
-    window: { Promise },
+    window: { Promise, crypto: browserCrypto },
     require: (name) => {
       assert.ok(name in dependencies, name);
       return dependencies[name];
@@ -21,7 +21,7 @@ function load(file, dependencies) {
   });
   return exports;
 }
-function database() {
+function database(browserCrypto) {
   const reads = [],
     writes = [],
     deletes = [],
@@ -54,10 +54,14 @@ function database() {
       deletes.push(ref);
     },
   };
-  const exported = load('src/application/firebase/database.js', {
-    'firebase/firestore': sdk,
-    'firebase/app': { getApp: () => 'app' },
-  });
+  const exported = load(
+    'src/application/firebase/database.js',
+    {
+      'firebase/firestore': sdk,
+      'firebase/app': { getApp: () => 'app' },
+    },
+    browserCrypto,
+  );
   return {
     ...exported,
     store: new exported.FireStore('database', 'guests'),
@@ -71,6 +75,36 @@ function database() {
     }),
   };
 }
+test('ゲストIDは暗号学的乱数を使い、連番とともに保存する', async () => {
+  const d = database({
+    getRandomValues: (bytes) => {
+      bytes.fill(171);
+      return bytes;
+    },
+  });
+  d.snapshots.push(d.snapshot([]));
+  const id = await d.store.createUserId();
+  assert.equal(id.guestCountWithPadding, '0000000001');
+  assert.equal(id.randomString, 'ab'.repeat(16));
+  assert.equal(
+    d.writes[0].ref.id,
+    `${id.guestCountWithPadding}${id.randomString}`,
+  );
+});
+
+test('安全な乱数が使えない場合はIDを保存しない', async () => {
+  const d = database({
+    getRandomValues: () => {
+      throw new Error('unavailable');
+    },
+  });
+  d.snapshots.push(d.snapshot([]));
+  await assert.rejects(d.store.createUserId(), {
+    message: 'Create Id Error',
+  });
+  assert.equal(d.writes.length, 0);
+});
+
 test('歴代ランキングは得点降順・日時昇順の上位10件を要求する', async () => {
   const d = database();
   const rows = [{ userId: 'first', point: 20 }];
