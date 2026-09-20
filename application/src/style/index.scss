@@ -1,7 +1,6 @@
-// 全体
-body {
-    // bootstrapの背景色が設定されないように
-    background-color: #158467 !important; // #4aa96c,387c6d,5aa469
+// 開始・結果画面とプレイ中の芝生で共通の背景色
+.bg-field {
+    background-color: #0a3d2d;
 }
 
 // 野球盤
