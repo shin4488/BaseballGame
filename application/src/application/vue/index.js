@@ -3,6 +3,7 @@ import { FirebaseAuthExtention } from '../firebase/auth';
 import { FireStoreExtention, FireStoreColumn } from '../firebase/database';
 import {
   isHitCircleToLine,
+  getBoardHitTime,
   getResultMessage,
   getRandomNumber,
 } from './process';
@@ -416,21 +417,22 @@ export const createVueInstance = () => {
        * ゲーム開始
        */
       executeBaseballGame() {
+        if (this.isGameOpened) return;
         // ゲーム開始前に初期化する
         this.clearBaseballGame();
 
         this.message = 'プレイボール！';
         this.isGameOpened = true;
 
-        // 3アウトになるまで繰り返し投げ続ける
-        const baseballGame = setInterval(async () => {
+        // 前の投球が完了するまで、次の投球を予約しない。
+        const pitchNext = async () => {
+          const startedAt = Date.now();
           // 1球投げる
           await this.throwBall();
 
           this.clearThrowingBall();
 
           if (this.outCount >= 3) {
-            clearInterval(baseballGame);
             // ゲームセット後、一定時間はゲーム画面をそのまま表示する
             // 3アウト後にいきなり結果表示画面に移るとびっくりするため
             setTimeout(() => {
@@ -443,7 +445,16 @@ export const createVueInstance = () => {
             }, this.messageShowingInterval);
             return;
           }
-        }, this.reThrowInterval);
+          // 通常の投球間隔を保ち、長い打球でも結果表示を省略しない。
+          setTimeout(
+            pitchNext,
+            Math.max(
+              this.reThrowInterval - (Date.now() - startedAt),
+              this.messageShowingInterval,
+            ),
+          );
+        };
+        setTimeout(pitchNext, this.reThrowInterval);
       },
       /**
        * 盤のセット
@@ -486,6 +497,7 @@ export const createVueInstance = () => {
           this.maxBallSpeed,
         );
         let xBallIncrement = 0;
+        let previousBallCenter = null;
 
         await new window.Promise((resolve) => {
           const ballMoveProcess = setInterval(() => {
@@ -519,6 +531,7 @@ export const createVueInstance = () => {
                 -this.maxXBallPosition,
                 this.maxXBallPosition,
               );
+              previousBallCenter = ballCenterVec2;
               return;
             }
 
@@ -540,39 +553,34 @@ export const createVueInstance = () => {
               return;
             }
 
-            // 盤への当たり判定
-            for (const board of boardList) {
-              const boardPosition = board.getBoundingClientRect();
-              const boardBottom = boardPosition.bottom;
-              // 盤下面とボールの当たり判定
-              const boardBottomStartVec2 = new Vector2(
-                boardPosition.left,
-                boardBottom,
-              );
-              const boardBottomEndVec2 = new Vector2(
-                boardPosition.right,
-                boardBottom,
-              );
-              const isHitToBottomBoard = isHitCircleToLine(
-                boardBottomStartVec2,
-                boardBottomEndVec2,
-                ballCenterVec2,
-                this.ballRadiusComputed,
-                0,
-              );
-              if (isHitToBottomBoard) {
-                this.point += Number(board.dataset.point);
-                const outNumber = Number(board.dataset.out);
-                this.outCount =
-                  this.outCount + outNumber >= 3
-                    ? 3
-                    : this.outCount + outNumber;
-                this.strikeCount = 0;
-                this.message = board.dataset.message;
-                clearInterval(ballMoveProcess);
-                resolve();
-                return;
+            // 移動中の軌道を調べ、表示順ではなく最初に触れた的を採用する。
+            let hitBoard = null;
+            let firstHitTime = Infinity;
+            if (yBallIncrement < 0) {
+              for (const board of boardList) {
+                const hitTime = getBoardHitTime(
+                  previousBallCenter,
+                  ballCenterVec2,
+                  this.ballRadiusComputed,
+                  board.getBoundingClientRect(),
+                );
+                if (hitTime !== null && hitTime < firstHitTime) {
+                  hitBoard = board;
+                  firstHitTime = hitTime;
+                }
               }
+            }
+            if (hitBoard) {
+              this.point += Number(hitBoard.dataset.point);
+              this.outCount = Math.min(
+                3,
+                this.outCount + Number(hitBoard.dataset.out),
+              );
+              this.strikeCount = 0;
+              this.message = hitBoard.dataset.message;
+              clearInterval(ballMoveProcess);
+              resolve();
+              return;
             }
 
             // フェアゾーンに打ち返して盤に当たらなかったときはアウト
@@ -614,6 +622,8 @@ export const createVueInstance = () => {
               resolve();
               return;
             }
+
+            previousBallCenter = ballCenterVec2;
 
             // ボール移動
             this.yBallPosition += yBallIncrement;

@@ -59,6 +59,45 @@ export const isHitCircleToLine = (
 };
 
 /**
+ * 上向きの打球が的の下面へ最初に触れる時刻（1更新を0〜1とする）。
+ * 前後の座標を結ぶ軌道と、ボール半径を持つ線分との交差を調べる。
+ * 命中しない場合はnull。端の丸みも調べ、隣の的への誤判定を防ぐ。
+ */
+export const getBoardHitTime = (previous, current, radius, board) => {
+  if (!previous || current.y >= previous.y) return null;
+  const dx = current.x - previous.x;
+  const dy = current.y - previous.y;
+  const closestX = Math.max(board.left, Math.min(board.right, previous.x));
+  if (
+    (previous.x - closestX) ** 2 + (previous.y - board.bottom) ** 2 <=
+    radius ** 2
+  ) {
+    return 0;
+  }
+
+  const times = [];
+  // 線分の中央部分には、ボールの上端が下面に達した時点で触れる。
+  const time = (board.bottom + radius - previous.y) / dy;
+  const x = previous.x + dx * time;
+  if (time >= 0 && time <= 1 && x >= board.left && x <= board.right) {
+    times.push(time);
+  }
+  // 線分の両端では、移動する円と端点の接触時刻を求める。
+  const a = dx * dx + dy * dy;
+  for (const edge of [board.left, board.right]) {
+    const ox = previous.x - edge;
+    const oy = previous.y - board.bottom;
+    const b = 2 * (ox * dx + oy * dy);
+    const c = ox * ox + oy * oy - radius * radius;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) continue;
+    const edgeTime = (-b - Math.sqrt(discriminant)) / (2 * a);
+    if (edgeTime >= 0 && edgeTime <= 1) times.push(edgeTime);
+  }
+  return times.length ? Math.min(...times) : null;
+};
+
+/**
  * 乱数発生
  * @param {*} max
  * @param {*} min
