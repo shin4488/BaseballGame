@@ -6,6 +6,7 @@ import {
   startAt,
   limit,
   getDocs,
+  getCountFromServer,
   doc,
   setDoc,
   deleteDoc,
@@ -42,28 +43,17 @@ export class FireStore {
    */
   async getRankingThisWeek() {
     try {
-      const topRanking = await getDocs(
-        query(
-          collection(this._firestore, this._collection),
-          orderBy(FireStoreColumn.point, 'desc'),
-        ),
-      );
-      if (topRanking.docs.length === 0) {
-        return [];
-      }
-
-      const topRankingPoint = topRanking.docs[0].data()[FireStoreColumn.point];
       const basisDate = new Date();
       basisDate.setDate(basisDate.getDate() - 7);
 
-      // startAtで(得点, 日付)の順で指定すると想定通りの挙動をしないため、(日付, 得点)の順で指定している
+      // 7日前以降を取得し、全体を得点順に並べてから上位10件に絞る。
       // 日付順を得点順より優先してしまっているため、limitを付けると日付が最近でランキング上位者が取得されなくなる
       const guests = await getDocs(
         query(
           collection(this._firestore, this._collection),
           orderBy(FireStoreColumn.lastUpdated),
           orderBy(FireStoreColumn.point, 'desc'),
-          startAt(basisDate, topRankingPoint),
+          startAt(basisDate),
         ),
       );
 
@@ -108,8 +98,8 @@ export class FireStore {
 
       // ゲストユーザのユーザIDを生成
       const guestCount = (
-        await getDocs(collection(this._firestore, this._collection))
-      ).size;
+        await getCountFromServer(collection(this._firestore, this._collection))
+      ).data().count;
       const guestCountWithPadding = `${zeros.join('')}${guestCount + 1}`.slice(
         -randomSize,
       );
@@ -182,10 +172,10 @@ export class FireStoreExtention {
    * 歴代のランキングの取得
    */
   static async getRankingHistory() {
-    const guestRankingList =
-      await FireStoreExtention.guestStore.getRankingHistory();
-    const loginUserRankingList =
-      await FireStoreExtention.loginUserStore.getRankingHistory();
+    const [guestRankingList, loginUserRankingList] = await Promise.all([
+      FireStoreExtention.guestStore.getRankingHistory(),
+      FireStoreExtention.loginUserStore.getRankingHistory(),
+    ]);
 
     const rankingList = guestRankingList.concat(loginUserRankingList);
     const sortedRankingTop10List =
@@ -198,10 +188,10 @@ export class FireStoreExtention {
    * 今週のランキングの取得
    */
   static async getRankingThisWeek() {
-    const guestRankingList =
-      await FireStoreExtention.guestStore.getRankingThisWeek();
-    const loginUserRankingList =
-      await FireStoreExtention.loginUserStore.getRankingThisWeek();
+    const [guestRankingList, loginUserRankingList] = await Promise.all([
+      FireStoreExtention.guestStore.getRankingThisWeek(),
+      FireStoreExtention.loginUserStore.getRankingThisWeek(),
+    ]);
 
     const rankingList = guestRankingList.concat(loginUserRankingList);
     const sortedRankingTop10List =
