@@ -35,10 +35,6 @@ export const createVueInstance = () => {
         return `border-bottom: ${this.ballSize}px solid;
           line-height: ${this.ballSize}px;`;
       },
-      resultBoardStyleComputed() {
-        return `left: ${-window.document.documentElement.clientWidth / 1.31}px;
-          top: ${window.document.documentElement.clientHeight - 80}px;`;
-      },
       playingResultStyleComputed() {
         return `top: ${window.document.documentElement.clientHeight / 2}px;`;
       },
@@ -104,6 +100,10 @@ export const createVueInstance = () => {
             : this.loginUserName;
         return `こんにちは ${userName} さん`;
       },
+      /** 得点は結果画面で独立して表示する */
+      resultHeadlineComputed() {
+        return this.resultMessage.replace(/ \d+ 得点$/, '');
+      },
       /** ログインユーザでスタートボタンの表示テキスト */
       userStartButtonTextComputed() {
         return this.loginUserName === null
@@ -150,9 +150,6 @@ export const createVueInstance = () => {
       loginUserName: null,
       batSwingButtonText: '打つ',
       pointUnitText: '点',
-      // 1バイト文字だと「S」「O」で大きさが異なるため2バイト文字としている
-      strikeText: 'Ｓ : ',
-      outText: 'Ｏ : ',
       message: '',
       resultMessage: '',
       boardItems: [],

@@ -1,6 +1,6 @@
 # 開発ガイド
 
-ブラウザで動く野球ゲーム。ゲームの入口は `application/src/main.js` と `application/src/application/vue/`、認証・保存は `application/src/application/firebase/`。機能を変えるときは [機能メモ](application/document/features.md)の関連箇所も確認する。
+ブラウザで動く野球ゲーム。ゲームの入口は `application/src/main.js` と `application/src/application/vue/`、認証・保存は `application/src/application/firebase/`。
 
 ## 開発・検証
 
