@@ -112,9 +112,9 @@
                             <p class="text-success mb-2"><strong class="display-1 fw-bold">{{ point }}</strong><span class="ms-3">得点</span></p>
                             <p class="h4 fw-bold text-break mb-4">{{ resultHeadlineComputed }}</p>
                             <div class="d-grid gap-3 border-top pt-4">
-                                <button type="button" class="btn btn-success fw-bold px-4 py-2 text-break" @click="onClickSaveButton">{{ resultShowingButtonTexts.saveResultText }}</button>
-                                <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 text-break" @click="onClickRetryButton">{{ resultShowingButtonTexts.retryText }}</button>
-                                <button type="button" class="btn btn-link text-success" @click="onClickFinishButton">{{ resultShowingButtonTexts.finishWithoutSaveText }}<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-success fw-bold px-4 py-2 text-break" :disabled="isSavingResult" @click="onClickSaveButton">{{ isSavingResult ? '保存中…' : resultShowingButtonTexts.saveResultText }}</button>
+                                <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 text-break" :disabled="isSavingResult" @click="onClickRetryButton">{{ resultShowingButtonTexts.retryText }}</button>
+                                <button type="button" class="btn btn-link text-success" :disabled="isSavingResult" @click="onClickFinishButton">{{ resultShowingButtonTexts.finishWithoutSaveText }}<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
                             </div>
                         </section>
                     </main>
