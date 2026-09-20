@@ -164,6 +164,7 @@ export const createVueInstance = () => {
       shouldShowInitImage: true,
       isGameOpened: false,
       shouldShowResult: false,
+      isSavingResult: false,
     },
     async mounted() {
       window.addEventListener('resize', this.updateViewport);
@@ -289,7 +290,9 @@ export const createVueInstance = () => {
       /**
        * 「保存」ボタン押下処理
        */
-      onClickSaveButton() {
+      async onClickSaveButton() {
+        if (this.isSavingResult) return;
+        this.isSavingResult = true;
         const isLoggedIn = FirebaseAuthExtention.auth.isLoggedIn();
         const loginUserId = FirebaseAuthExtention.auth.getLoginUserId();
         const loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
@@ -303,19 +306,28 @@ export const createVueInstance = () => {
           userIconImageUrl: isLoggedIn ? loginUserIconImage : guestImagePath,
           point: this.point,
         };
-        if (isLoggedIn) {
-          FireStoreExtention.loginUserStore.upsertRanking(parameter);
-        } else {
-          FireStoreExtention.guestStore.upsertRanking(parameter);
+        try {
+          const store = isLoggedIn
+            ? FireStoreExtention.loginUserStore
+            : FireStoreExtention.guestStore;
+          await store.upsertRanking(parameter);
+        } catch {
+          window.alert(
+            '保存できませんでした。通信状態を確認して、もう一度お試しください。',
+          );
+          return;
+        } finally {
+          this.isSavingResult = false;
         }
 
         this.shouldShowResult = false;
-        this.initializeTopMenuData();
+        await this.initializeTopMenuData();
       },
       /**
        * 「保存せずにリトライ」ボタン押下処理
        */
       onClickRetryButton() {
+        if (this.isSavingResult) return;
         this.shouldShowResult = false;
         this.executeBaseballGame();
       },
@@ -323,6 +335,7 @@ export const createVueInstance = () => {
        * 結果表示画面で「保存せずに閉じる」ボタン押下処理
        */
       onClickFinishButton() {
+        if (this.isSavingResult) return;
         this.shouldShowResult = false;
         this.initializeTopMenuData();
       },
