@@ -133,9 +133,8 @@
             <!-- ボックス -->
             <div class="point-box">
                 <!-- クラス名を処理内で使用しているため、クラス名を変更しない -->
-                <div class="point-item d-flex align-items-center justify-content-center rounded-bottom border border-top-0 shadow-sm fw-bold"
-                    :class="item.value.out > 0 ? 'bg-dark text-white border-secondary' : 'bg-light text-success border-success'"
-                    :style="boardItemStyleComputed"
+                <div class="point-item d-flex align-items-center justify-content-center rounded-bottom text-dark fw-bold"
+                    :style="`${boardItemStyleComputed} background-color: ${item.color};`"
                     v-for="(item, index) in boardItems"
                     :data-point="item.value.point"
                     :data-out="item.value.out"

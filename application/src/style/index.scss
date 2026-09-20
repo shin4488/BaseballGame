@@ -13,6 +13,8 @@
 
     .point-item {
         width: 150px;
+        // 従来の台形と同じ、上辺を左右20pxずつ内側に寄せる。
+        clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 100%, 0 100%);
     }
 }
 
