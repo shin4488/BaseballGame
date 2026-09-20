@@ -20,104 +20,106 @@
     <body>
         <div id="app">
             <!-- 開始・結果画面：操作とデータ処理は既存のVueメソッドを使用する -->
-            <div v-show="!isGameOpened" class="modal-root game-menu" v-cloak>
-                <main class="menu-surface" :class="{ 'menu-surface-result': shouldShowResult }">
-                    <header class="menu-header d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div class="menu-brand d-flex align-items-center gap-2">
-                            <img src="./image/ball.png" alt="" width="28" height="28">
-                            <span>BASEBALL GAME</span>
-                        </div>
-                        <span class="menu-user rounded-pill" :title="userMessageComputed">
-                            <i class="bi bi-person" aria-hidden="true"></i>
-                            {{ loginUserName === null ? (guestNumber === null ? 'ゲスト' : `ゲスト${guestNumber}`) : loginUserName }}
-                        </span>
-                    </header>
-
-                    <div v-show="shouldShowInitImage" class="menu-splash">
-                        <img alt="満塁野球" class="w-100 modal-image" src="./image/topText.png">
-                        <img alt="" class="w-100 modal-image" src="./image/top.png">
-                    </div>
-
-                    <section v-show="isSelectingModeShownComputed" aria-labelledby="menu-title">
-                        <div class="menu-hero text-center">
-                            <h1 id="menu-title">満塁野球</h1>
-                            <p class="mb-3">「打つ」でスイング。<wbr>3アウトでゲーム終了です。</p>
-                            <div class="menu-start-actions d-flex flex-wrap justify-content-center gap-3 mx-auto">
-                                <button type="button" class="btn btn-field btn-lg" @click="onClickGuestStart">
-                                    <i class="bi bi-play-fill me-2" aria-hidden="true"></i>{{ guestButtonText }}
-                                </button>
-                                <button type="button" class="btn btn-field-outline btn-lg" @click="onClickLogin">
-                                    <i class="bi bi-person me-2" aria-hidden="true"></i>{{ userStartButtonTextComputed }}
-                                </button>
+            <div class="modal bg-success" :class="{ 'd-block': !isGameOpened }"
+                role="dialog" aria-modal="true" :aria-label="shouldShowResult ? 'プレイ結果' : '満塁野球'">
+                <div class="modal-dialog modal-dialog-centered my-2" :class="{ 'modal-xl': !shouldShowResult }">
+                    <main class="modal-content bg-light border-0 rounded-3 shadow p-3 text-dark">
+                        <header class="d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                            <div class="d-flex align-items-center gap-2 fw-bold text-success">
+                                <img src="./image/ball.png" alt="" width="28" height="28">
+                                <span>BASEBALL GAME</span>
                             </div>
-                            <button v-show="loginUserName !== null" type="button" class="btn menu-link menu-account"
-                                @click="onClickChangeAccount">{{ changeAccountButtonText }}</button>
+                            <span class="border rounded-pill bg-white px-3 py-2 text-break" :title="userMessageComputed">
+                                <i class="bi bi-person" aria-hidden="true"></i>
+                                {{ loginUserName === null ? (guestNumber === null ? 'ゲスト' : `ゲスト${guestNumber}`) : loginUserName }}
+                            </span>
+                        </header>
+
+                        <div v-show="shouldShowInitImage" class="col-10 col-sm-6 mx-auto py-3">
+                            <img alt="満塁野球" class="img-fluid d-block mx-auto" src="./image/topText.png">
+                            <img alt="" class="img-fluid d-block mx-auto" src="./image/top.png">
                         </div>
 
-                        <div class="row g-4">
-                            <section v-for="(item, rankingKey) in rankings" :key="rankingKey" class="col-12 col-lg-6"
-                                :aria-labelledby="`ranking-${rankingKey}`">
-                                <div class="ranking-card h-100">
-                                    <h2 :id="`ranking-${rankingKey}`" class="h5 fw-bold mb-3">
-                                        <i :class="rankingKey === 'thisWeek' ? 'bi bi-trophy' : 'bi bi-award'" class="me-2" aria-hidden="true"></i>{{ item.titleText }}
-                                    </h2>
-                                    <div v-if="item.dataList.length === 0" class="ranking-empty text-center">
-                                        <img src="./image/ball.png" alt="" width="56" height="56" class="mb-4">
-                                        <p class="fw-bold mb-2">{{ rankingKey === 'thisWeek' ? '今週の記録はまだありません' : '記録はまだありません' }}</p>
-                                        <p class="small mb-0">最初のスコアを残そう</p>
-                                    </div>
-                                    <div v-else class="table-responsive">
-                                        <table class="table ranking-table align-middle mb-0">
-                                            <caption class="visually-hidden">{{ item.titleText }}</caption>
-                                            <thead>
-                                                <tr>
-                                                    <th scope="col" class="ranking-position">{{ item.headerTexts.rankingText }}</th>
-                                                    <th scope="col">{{ item.headerTexts.playerText }}</th>
-                                                    <th scope="col" class="ranking-point">{{ item.headerTexts.pointText }}</th>
-                                                    <th scope="col" class="ranking-date">{{ item.headerTexts.playDateText }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="(data, rankIndex) in item.dataList" :key="data.playerId">
-                                                    <td><span class="rank-number" :class="{ 'rank-first': rankIndex === 0 }">{{ rankIndex + 1 }}</span></td>
-                                                    <td :title="data.playerName">
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <img v-if="data.playerIconImage" class="player-avatar rounded-circle d-none d-sm-block" alt="" :src="data.playerIconImage">
-                                                            <i v-else class="bi bi-person d-none d-sm-block" aria-hidden="true"></i>
-                                                            <span class="text-truncate">{{ data.playerName }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td><span class="score-badge">{{ data.point }}</span></td>
-                                                    <td>
-                                                        <span>{{ data.playDate }}</span>
-                                                        <button v-if="data.isLoginUser" type="button" class="btn btn-sm menu-link p-1"
-                                                            :aria-label="`${data.playerName}の${data.playDate}の記録を削除`" title="記録を削除"
-                                                            @click="onClickRecordDeleteButton(data)">
-                                                            <i class="bi bi-trash" aria-hidden="true"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                        <section v-show="isSelectingModeShownComputed" aria-labelledby="menu-title">
+                            <div class="text-center py-2">
+                                <h1 id="menu-title" class="h2 fw-bold text-success">満塁野球</h1>
+                                <p class="text-muted mb-2">「打つ」でスイング。<wbr>3アウトでゲーム終了です。</p>
+                                <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                                    <button type="button" class="btn btn-success fw-bold px-4 py-2 text-break" @click="onClickGuestStart">
+                                        <i class="bi bi-play-fill me-2" aria-hidden="true"></i>{{ guestButtonText }}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 text-break" @click="onClickLogin">
+                                        <i class="bi bi-person me-2" aria-hidden="true"></i>{{ userStartButtonTextComputed }}
+                                    </button>
                                 </div>
-                            </section>
-                        </div>
-                    </section>
+                                <button v-show="loginUserName !== null" type="button" class="btn btn-link text-success btn-sm mt-1"
+                                    @click="onClickChangeAccount">{{ changeAccountButtonText }}</button>
+                            </div>
 
-                    <section v-show="shouldShowResult" class="menu-result text-center" aria-labelledby="result-title">
-                        <h1 id="result-title" class="result-eyebrow h6 fw-bold">プレイ結果</h1>
-                        <p class="result-score mb-2"><strong>{{ point }}</strong><span class="ms-3">得点</span></p>
-                        <p class="result-headline fw-bold">{{ resultHeadlineComputed }}</p>
-                        <div class="result-actions d-grid gap-3">
-                            <button type="button" class="btn btn-field btn-lg" @click="onClickSaveButton">{{ resultShowingButtonTexts.saveResultText }}</button>
-                            <button type="button" class="btn btn-field-outline btn-lg" @click="onClickRetryButton">{{ resultShowingButtonTexts.retryText }}</button>
-                            <button type="button" class="btn menu-link" @click="onClickFinishButton">{{ resultShowingButtonTexts.finishWithoutSaveText }}<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
-                        </div>
-                    </section>
-                </main>
+                            <div class="row g-3 mt-0">
+                                <section v-for="(item, rankingKey) in rankings" :key="rankingKey" class="col-12 col-lg-6"
+                                    :aria-labelledby="`ranking-${rankingKey}`">
+                                    <div class="card h-100 p-3 shadow-sm">
+                                        <h2 :id="`ranking-${rankingKey}`" class="h5 fw-bold text-success mb-2">
+                                            <i :class="rankingKey === 'thisWeek' ? 'bi bi-trophy' : 'bi bi-award'" class="me-2" aria-hidden="true"></i>{{ item.titleText }}
+                                        </h2>
+                                        <div v-if="item.dataList.length === 0" class="d-flex flex-column flex-grow-1 align-items-center justify-content-center border-top text-center text-muted py-5">
+                                            <img src="./image/ball.png" alt="" width="56" height="56" class="mb-3">
+                                            <p class="fw-bold mb-2">{{ rankingKey === 'thisWeek' ? '今週の記録はまだありません' : '記録はまだありません' }}</p>
+                                            <p class="small mb-0">最初のスコアを残そう</p>
+                                        </div>
+                                        <div v-else class="table-responsive">
+                                            <table class="table table-sm align-middle small mb-0">
+                                                <caption class="visually-hidden">{{ item.titleText }}</caption>
+                                                <thead class="table-light text-nowrap">
+                                                    <tr>
+                                                        <th scope="col">{{ item.headerTexts.rankingText }}</th>
+                                                        <th scope="col">{{ item.headerTexts.playerText }}</th>
+                                                        <th scope="col">{{ item.headerTexts.pointText }}</th>
+                                                        <th scope="col">{{ item.headerTexts.playDateText }}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(data, rankIndex) in item.dataList" :key="data.playerId">
+                                                        <td><span class="badge rounded-pill" :class="rankIndex === 0 ? 'bg-warning text-dark' : 'bg-light text-secondary'">{{ rankIndex + 1 }}</span></td>
+                                                        <td class="w-50" :title="data.playerName">
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <img v-if="data.playerIconImage" class="rounded-circle flex-shrink-0 d-none d-sm-block" width="24" height="24" alt="" :src="data.playerIconImage">
+                                                                <i v-else class="bi bi-person d-none d-sm-block" aria-hidden="true"></i>
+                                                                <span class="text-break">{{ data.playerName }}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td><span class="badge bg-success">{{ data.point }}</span></td>
+                                                        <td class="text-nowrap text-muted">
+                                                            <span>{{ data.playDate }}</span>
+                                                            <button v-if="data.isLoginUser" type="button" class="btn btn-sm btn-link text-success p-0"
+                                                                :aria-label="`${data.playerName}の${data.playDate}の記録を削除`" title="記録を削除"
+                                                                @click="onClickRecordDeleteButton(data)">
+                                                                <i class="bi bi-trash" aria-hidden="true"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </section>
+
+                        <section v-show="shouldShowResult" class="text-center pt-4 pb-2" aria-labelledby="result-title">
+                            <h1 id="result-title" class="h6 fw-bold text-success">プレイ結果</h1>
+                            <p class="text-success mb-2"><strong class="display-1 fw-bold">{{ point }}</strong><span class="ms-3">得点</span></p>
+                            <p class="h4 fw-bold text-break mb-4">{{ resultHeadlineComputed }}</p>
+                            <div class="d-grid gap-3 border-top pt-4">
+                                <button type="button" class="btn btn-success fw-bold px-4 py-2 text-break" @click="onClickSaveButton">{{ resultShowingButtonTexts.saveResultText }}</button>
+                                <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 text-break" @click="onClickRetryButton">{{ resultShowingButtonTexts.retryText }}</button>
+                                <button type="button" class="btn btn-link text-success" @click="onClickFinishButton">{{ resultShowingButtonTexts.finishWithoutSaveText }}<i class="bi bi-chevron-right ms-2" aria-hidden="true"></i></button>
+                            </div>
+                        </section>
+                    </main>
+                </div>
             </div>
-            <div v-show="!isGameOpened" class="modal-overlay" aria-hidden="true" v-cloak></div>
 
             <!-- ボックス -->
             <div class="point-box">
