@@ -166,7 +166,7 @@
                     :style="hitButtonStyleComputed"
                     @click="onClickHit"
                 >
-                    <span class="d-block col-6 col-lg-12">{{ batSwingButtonText }}</span>
+                    <span>{{ batSwingButtonText }}</span>
                 </button>
             </div>
 
@@ -176,11 +176,11 @@
                     :style="playingResultStyleComputed">{{ message }}</span>
             </div>
 
-            <!-- 打撃ボタンと同じ座標を使い、重なる部分のタップもボタンへ通す -->
-            <div v-show="isGameOpened" class="position-absolute end-0 me-2 me-lg-5 mt-4 translate-middle-y pe-none"
+            <!-- 打撃ボタンの上端を基準に、スコアを8px上へ配置する -->
+            <div v-show="isGameOpened" class="position-absolute end-0 me-2 me-lg-5 pe-none"
                 :style="hitButtonStyleComputed"
                 role="status" :aria-label="`${point}点、ストライク${strikeCount}、アウト${outCount}`">
-                <div class="d-flex align-items-center gap-2 bg-dark text-white border border-secondary rounded-3 shadow-sm px-2 py-1" aria-hidden="true">
+                <div class="position-absolute bottom-0 end-0 mb-2 d-flex align-items-center gap-2 bg-dark text-white text-nowrap border border-secondary rounded-3 shadow-sm px-2 py-1" aria-hidden="true">
                     <div class="text-center px-1">
                         <strong class="h4 fw-bold mb-0">{{ point }}</strong>
                         <span class="ms-1">{{ pointUnitText }}</span>
