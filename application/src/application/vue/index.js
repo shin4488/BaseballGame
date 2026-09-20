@@ -104,6 +104,10 @@ export const createVueInstance = () => {
             : this.loginUserName;
         return `こんにちは ${userName} さん`;
       },
+      /** 得点は結果画面で独立して表示する */
+      resultHeadlineComputed() {
+        return this.resultMessage.replace(/ \d+ 得点$/, '');
+      },
       /** ログインユーザでスタートボタンの表示テキスト */
       userStartButtonTextComputed() {
         return this.loginUserName === null

@@ -1,0 +1,169 @@
+// 開始・結果画面の共通テーマ。ゲーム盤のスタイルから分離する。
+$field: #10553f;
+$field-hover: #0a3d2d;
+$surface: #faf9f3;
+$ink: #153d32;
+$muted: #657970;
+$line: #dce4de;
+$gold: #c8a34e;
+$radius: 1.25rem;
+
+[v-cloak] { display: none; }
+
+.modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    overflow-y: auto;
+    padding: clamp(1rem, 4vw, 3.5rem);
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background-color: $field-hover;
+    background-image:
+        linear-gradient(45deg, transparent 49.8%, rgba(255, 255, 255, .045) 50%, transparent 50.2%),
+        linear-gradient(-45deg, transparent 49.8%, rgba(255, 255, 255, .045) 50%, transparent 50.2%),
+        radial-gradient(ellipse at top, $field, transparent 80%);
+    background-size: 48rem 48rem, 48rem 48rem, auto;
+}
+
+.game-menu {
+    color: $ink;
+
+    .menu-surface {
+        width: 100%;
+        max-width: 1200px;
+        margin: auto;
+        padding: clamp(1.25rem, 3vw, 2.5rem);
+        border-radius: $radius;
+        background: $surface;
+        box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .2);
+        min-width: 0;
+    }
+
+    .menu-surface-result { max-width: 640px; }
+    .menu-header { font-size: .875rem; }
+    .menu-brand { font-weight: 700; letter-spacing: .16em; }
+    .menu-user {
+        max-width: 100%;
+        padding: .5rem .9rem;
+        border: 1px solid $line;
+        background: white;
+        overflow-wrap: anywhere;
+    }
+
+    .menu-splash {
+        max-width: 420px;
+        margin: 2rem auto;
+        .modal-image { object-fit: contain; max-height: 320px; }
+    }
+
+    .menu-hero {
+        padding: clamp(2rem, 5vw, 4rem) 0;
+        h1 { font-size: clamp(1.8rem, 4.5vw, 3.5rem); font-weight: 800; letter-spacing: -.04em; }
+        p { color: $muted; margin-top: 1rem; }
+    }
+
+    .menu-start-actions {
+        max-width: 720px;
+        .btn { flex: 1 1 260px; }
+    }
+
+    // Bootstrapのボタン構造・余白を活かし、テーマ色のみ共通化する。
+    .btn {
+        border-radius: .75rem;
+        overflow-wrap: anywhere;
+        &:focus-visible { outline: 3px solid $gold; outline-offset: 3px; }
+    }
+    .btn-field, .btn-field-outline { padding: .85rem 1.25rem; font-weight: 700; }
+    .btn-field {
+        color: white;
+        background: $field;
+        border-color: $field;
+        &:hover, &:focus { color: white; background: $field-hover; border-color: $field-hover; }
+    }
+    .btn-field-outline {
+        color: $field;
+        border-color: $field;
+        &:hover, &:focus { color: white; background: $field; }
+    }
+    .menu-link {
+        color: $field;
+        &:hover { color: $field-hover; text-decoration: underline; }
+    }
+
+    .ranking-card {
+        padding: clamp(1rem, 2vw, 1.5rem);
+        border: 1px solid $line;
+        border-radius: .875rem;
+        background: white;
+        box-shadow: 0 .25rem 1rem rgba(16, 85, 63, .035);
+    }
+    .ranking-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 260px;
+        border-top: 1px solid $line;
+        color: $muted;
+        img { opacity: .35; filter: grayscale(1); }
+    }
+    .ranking-table {
+        table-layout: fixed;
+        min-width: 280px;
+        font-size: .875rem;
+        color: $ink;
+        th { color: $muted; background: #f1f5f2; font-weight: 500; white-space: nowrap; }
+        th, td { padding: .85rem .35rem; border-color: $line; }
+        tbody tr:last-child td { border-bottom: 0; }
+        .ranking-position { width: 40px; }
+        .ranking-point { width: 44px; }
+        .ranking-date { width: 96px; }
+        td:last-child { color: $muted; font-size: .8rem; }
+    }
+    .player-avatar { width: 28px; height: 28px; flex-shrink: 0; object-fit: cover; }
+    .rank-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 50%;
+        background: #edf2ef;
+        font-weight: 700;
+    }
+    .rank-first { background: #f5e7be; color: #705014; }
+    .score-badge {
+        display: inline-block;
+        min-width: 2rem;
+        padding: .2rem .35rem;
+        border-radius: .5rem;
+        background: #def2e9;
+        color: $field;
+        font-weight: 700;
+    }
+
+    .menu-result { padding: 3rem 0 .5rem; }
+    .result-eyebrow { letter-spacing: .15em; }
+    .result-eyebrow::before, .result-eyebrow::after {
+        content: '';
+        display: inline-block;
+        width: 2rem;
+        height: 2px;
+        background: $gold;
+        vertical-align: middle;
+        margin: 0 1rem;
+    }
+    .result-score {
+        color: $field;
+        strong { font-size: clamp(5rem, 16vw, 8rem); line-height: 1.3; font-variant-numeric: tabular-nums; }
+        span { font-size: 1.25rem; font-weight: 700; }
+    }
+    .result-headline { font-size: clamp(1.35rem, 3vw, 2rem); overflow-wrap: anywhere; }
+    .result-actions { border-top: 1px solid $line; margin-top: 2rem; padding-top: 2rem; }
+}
