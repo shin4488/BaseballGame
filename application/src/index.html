@@ -91,15 +91,15 @@
                         <div class="col-12 font-weight-bold h5 my-3">{{ resultMessage }}</div>
                         <button type="button"
                             class="btn btn-outline-primary col-12 col-sm-3 mx-2"
-                            @click="onClickSaveButton"
-                        >{{ resultShowingButtonTexts.saveResultText }}</button>
+                            :disabled="isSavingResult" @click="onClickSaveButton"
+                        >{{ isSavingResult ? '保存中…' : resultShowingButtonTexts.saveResultText }}</button>
                         <button type="button"
                             class="btn btn-outline-secondary col-12 col-sm-3 mx-2"
-                            @click="onClickRetryButton"
+                            :disabled="isSavingResult" @click="onClickRetryButton"
                         >{{ resultShowingButtonTexts.retryText }}</button>
                         <button type="button"
                             class="btn btn-outline-secondary col-12 col-sm-3 mx-2"
-                            @click="onClickFinishButton"
+                            :disabled="isSavingResult" @click="onClickFinishButton"
                         >{{ resultShowingButtonTexts.finishWithoutSaveText }}</button>
                     </div>
                 </div>
