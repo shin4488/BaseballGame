@@ -31,7 +31,8 @@ function database(browserCrypto) {
   const reads = [],
     writes = [],
     deletes = [],
-    snapshots = [];
+    snapshots = [],
+    counts = [];
   const sdk = {
     initializeFirestore: (_app, options) => {
       assert.equal(options.ignoreUndefinedProperties, true);
@@ -46,6 +47,12 @@ function database(browserCrypto) {
     }),
     startAt: (...values) => ({ kind: 'start', values }),
     limit: (value) => ({ kind: 'limit', value }),
+    getCountFromServer: async (query) => {
+      counts.push(query);
+      const next = snapshots.shift();
+      if (next instanceof Error) throw next;
+      return { data: () => ({count: next.size}) };
+    },
     getDocs: async (query) => {
       reads.push(query);
       const next = snapshots.shift();
@@ -73,6 +80,7 @@ function database(browserCrypto) {
     sdk,
     store: new exported.FireStore('database', 'guests'),
     reads,
+    counts,
     writes,
     deletes,
     snapshots,
@@ -92,6 +100,8 @@ test('ゲストIDは暗号学的乱数を使い、連番とともに保存する
   d.snapshots.push(d.snapshot([]));
   const id = await d.store.createUserId();
   assert.equal(id.guestCountWithPadding, '0000000001');
+  assert.equal(d.reads.length, 0);
+  assert.equal(d.counts.length, 1);
   assert.equal(id.randomString, 'ab'.repeat(16));
   assert.equal(
     d.writes[0].ref.id,
@@ -228,9 +238,9 @@ test('画面はゲスト保存失敗時にIDを設定せずゲームを始めな
     throw new Error('offline');
   };
   const screen = guestScreen(d.store);
-  await assert.rejects(screen.onClickGuestStart(), {
-    message: 'Create Id Error',
-  });
+  await screen.onClickGuestStart();
+  assert.match(screen.startError, /開始できませんでした/);
+  assert.equal(screen.isStartingGame, false);
   assert.equal(screen.guestUserId, null);
   assert.equal(screen.hasStarted(), false);
 });
@@ -253,23 +263,23 @@ test('空の今週ランキングは追加クエリを送らない', async () =>
   assert.equal((await d.store.getRankingThisWeek()).length, 0);
   assert.equal(d.reads.length, 1);
 });
-test('今週は7日前と最高得点を境界に取得し、仮登録を除く', async () => {
+test('今週は7日前から1回だけ取得し、仮登録を除く', async () => {
   const d = database(),
     before = Date.now();
   d.snapshots.push(
-    d.snapshot([{ point: 25 }]),
     d.snapshot([{ point: 25 }, { point: 0 }, { point: -1 }, {}]),
   );
   assert.deepEqual(
     (await d.store.getRankingThisWeek()).map((x) => x.point),
     [25, 0],
   );
-  const c = d.reads[1].constraints;
+  assert.equal(d.reads.length, 1);
+  const c = d.reads[0].constraints;
   assert.deepEqual(c.slice(0, 2), [
     { kind: 'order', field: 'lastUpdated', direction: 'asc' },
     { kind: 'order', field: 'point', direction: 'desc' },
   ]);
-  assert.equal(c[2].values[1], 25);
+  assert.equal(c[2].values.length, 1);
   assert.ok(
     Math.abs(c[2].values[0].getTime() - (before - 7 * 86400000)) < 1000,
   );
@@ -371,4 +381,104 @@ test('Google認証のキャンセルを成功扱いしない', async () => {
   await assert.rejects(a.handler.signInWithPopupToGoogle(), {
     message: 'cancelled',
   });
+});
+
+for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
+  test(`${method}は両コレクションを同時取得し、得点・日時順の上位10件を返す`, async () => {
+    const d = database();
+    let finishGuests, finishUsers;
+    d.FireStoreExtention.guestStore = { [method]: () => new Promise(r => { finishGuests = r; }) };
+    d.FireStoreExtention.loginUserStore = { [method]: () => new Promise(r => { finishUsers = r; }) };
+    const pending = d.FireStoreExtention[method]();
+    assert.equal(typeof finishGuests, 'function');
+    assert.equal(typeof finishUsers, 'function');
+    finishGuests(Array.from({length: 10}, (_,i) => ({point: i, lastUpdated: new Date(1000)})));
+    finishUsers([{point: 9, lastUpdated: new Date(0)}, {point: 20, lastUpdated: new Date(0)}]);
+    const result = await pending;
+    assert.equal(result.length, 10);
+    assert.equal(result[0].point, 20);
+    assert.equal(result[1].point, 9);
+    assert.equal(result[1].lastUpdated.getTime(), 0);
+    assert.equal(result[2].lastUpdated.getTime(), 1000);
+  });
+}
+
+function rankingScreen(sources) {
+  const { createVueInstance } = load('src/application/vue/index.js', {
+    '../vector/vector2': {},
+    '../firebase/auth': { FirebaseAuthExtention: {auth: {getLoginUserName: () => null}} },
+    '../firebase/database': { FireStoreExtention: sources },
+    './process': {}, './appConfig': {boardItems: []}, 'regenerator-runtime/runtime.js': {},
+  }, undefined, {
+    window: {document: {documentElement: {clientWidth: 390, clientHeight: 844}}, addEventListener: () => {}},
+    Vue: function(options) { return options; },
+  });
+  const options = createVueInstance();
+  const app = {...options.data, ...options.methods, mapFirestoreToRankingTable: async rows => rows};
+  return {app, options};
+}
+const flush = () => new Promise(resolve => setImmediate(resolve));
+
+test('遅い週間ランキングを待たず歴代を表示し、初回表示でゲストを作らない', async () => {
+  let finishHistory, finishWeek;
+  const {app, options} = rankingScreen({
+    getRankingHistory: () => new Promise(r => {finishHistory = r;}),
+    getRankingThisWeek: () => new Promise(r => {finishWeek = r;}),
+    guestStore: {createUserId: () => {throw new Error('Initial guest creation is forbidden');}},
+  });
+  options.mounted.call(app);
+  assert.equal(app.shouldShowInitImage, false);
+  assert.equal(app.guestUserId, null);
+  assert.equal(typeof finishWeek, 'function');
+  finishHistory([{point: 21}]);
+  await flush();
+  assert.equal(app.rankings.history.dataList[0].point, 21);
+  assert.equal(app.rankings.history.isLoading, false);
+  assert.equal(app.rankings.thisWeek.isLoading, true);
+  finishWeek([]);
+  await flush();
+  assert.equal(app.rankings.thisWeek.isLoading, false);
+});
+
+test('片方の取得失敗でも他方を表示し、再取得できる', async () => {
+  let fail = true;
+  const {app} = rankingScreen({
+    getRankingHistory: async () => [{point: 12}],
+    getRankingThisWeek: async () => {if (fail) throw new Error('offline'); return [{point: 7}];},
+  });
+  await app.initializeTopMenuData();
+  assert.equal(app.rankings.history.dataList[0].point, 12);
+  assert.ok(app.rankings.thisWeek.error);
+  assert.equal(app.rankings.thisWeek.isLoading, false);
+  fail = false;
+  await app.initializeTopMenuData();
+  assert.equal(app.rankings.thisWeek.error, '');
+  assert.equal(app.rankings.thisWeek.dataList[0].point, 7);
+});
+
+test('古い応答で新しいランキングを上書きしない', async () => {
+  const pending = [];
+  const {app} = rankingScreen({getRankingHistory: () => new Promise(r => pending.push(r)), getRankingThisWeek: async () => []});
+  const old = app.initializeTopMenuData();
+  const current = app.initializeTopMenuData();
+  pending[1]([{point: 20}]);
+  await current;
+  pending[0]([{point: 1}]);
+  await old;
+  assert.equal(app.rankings.history.dataList[0].point, 20);
+});
+
+test('ゲスト開始を連打しても登録は1回、登録後に開始する', async () => {
+  let count = 0, finish;
+  const screen = guestScreen({createUserId: () => {count++; return new Promise(r => {finish = r;});}});
+  const first = screen.onClickGuestStart();
+  await flush();
+  await screen.onClickGuestStart();
+  assert.equal(count, 1);
+  assert.equal(screen.hasStarted(), false);
+  finish({guestCountWithPadding: '0000000007', randomString: 'ab'.repeat(16)});
+  await first;
+  assert.equal(screen.hasStarted(), true);
+  assert.equal(screen.guestNumber, 7);
+  assert.equal(screen.isStartingGame, false);
 });

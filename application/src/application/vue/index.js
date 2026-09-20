@@ -99,6 +99,9 @@ export const createVueInstance = () => {
     data: {
       viewportWidth: window.document.documentElement.clientWidth,
       viewportHeight: window.document.documentElement.clientHeight,
+      rankingsRequestId: 0,
+      isStartingGame: false,
+      startError: '',
       guestNumber: null,
       guestUserId: null,
       rankings: {
@@ -107,12 +110,16 @@ export const createVueInstance = () => {
           themeColor: 'primary',
           headerTexts: {},
           dataList: [],
+          isLoading: true,
+          error: '',
         },
         history: {
           titleText: '歴代の得点ランキング',
           themeColor: 'success',
           headerTexts: {},
           dataList: [],
+          isLoading: true,
+          error: '',
         },
       },
       headerTexts: {
@@ -166,18 +173,11 @@ export const createVueInstance = () => {
       shouldShowResult: false,
       isSavingResult: false,
     },
-    async mounted() {
+    mounted() {
       window.addEventListener('resize', this.updateViewport);
-      this.initializeTopMenuData();
       this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
-      // 未ログイン時はゲストユーザを使用
-      if (this.loginUserName === null) {
-        await this.createGuestUser();
-      }
-
-      setTimeout(() => {
-        this.shouldShowInitImage = false;
-      }, this.messageShowingInterval);
+      this.shouldShowInitImage = false;
+      this.initializeTopMenuData();
       this.setBoardItems();
     },
     beforeDestroy() {
@@ -212,18 +212,28 @@ export const createVueInstance = () => {
        * ゲストでスタートボタン押下処理
        */
       async onClickGuestStart() {
-        await FirebaseAuthExtention.auth.signOutFromGoogle();
-        this.loginUserName = null;
-        if (this.guestUserId === null) {
-          await this.createGuestUser();
+        if (this.isStartingGame) return;
+        this.isStartingGame = true;
+        this.startError = '';
+        try {
+          await FirebaseAuthExtention.auth.signOutFromGoogle();
+          this.loginUserName = null;
+          if (this.guestUserId === null) {
+            await this.createGuestUser();
+          }
+          this.executeBaseballGame();
+        } catch {
+          this.startError =
+            '開始できませんでした。通信状態を確認して、もう一度お試しください。';
+        } finally {
+          this.isStartingGame = false;
         }
-
-        this.executeBaseballGame();
       },
       /**
        * ログインしてスタートボタン押下処理
        */
       async onClickLogin() {
+        if (this.isStartingGame) return;
         // 未ログイン時のみfirebaseログイン処理
         if (!FirebaseAuthExtention.auth.isLoggedIn()) {
           try {
@@ -244,6 +254,7 @@ export const createVueInstance = () => {
        * アカウントを切り替えてスタートボタン押下処理
        */
       async onClickChangeAccount() {
+        if (this.isStartingGame) return;
         try {
           await FirebaseAuthExtention.auth.signInWithPopupToGoogle();
         } catch {
@@ -344,19 +355,30 @@ export const createVueInstance = () => {
        * トップメニュー画面のデータセット
        */
       async initializeTopMenuData() {
-        this.rankings.history.headerTexts = this.headerTexts;
-        this.rankings.thisWeek.headerTexts = this.headerTexts;
-
-        // 今週と歴代のランキングデータを取得
-        // TODO:ランキング情報を取得中はモードセレクトしないように制御
-        const rankingHistoryList = await FireStoreExtention.getRankingHistory();
-        const rankingThisWeekList =
-          await FireStoreExtention.getRankingThisWeek();
-        this.rankings.history.dataList = await this.mapFirestoreToRankingTable(
-          rankingHistoryList,
-        );
-        this.rankings.thisWeek.dataList = await this.mapFirestoreToRankingTable(
-          rankingThisWeekList,
+        const requestId = ++this.rankingsRequestId;
+        const sources = [
+          ['history', () => FireStoreExtention.getRankingHistory()],
+          ['thisWeek', () => FireStoreExtention.getRankingThisWeek()],
+        ];
+        await Promise.all(
+          sources.map(async ([key, fetchRanking]) => {
+            const ranking = this.rankings[key];
+            ranking.headerTexts = this.headerTexts;
+            ranking.isLoading = true;
+            ranking.error = '';
+            try {
+              const rows = await fetchRanking();
+              const data = await this.mapFirestoreToRankingTable(rows);
+              if (requestId === this.rankingsRequestId) ranking.dataList = data;
+            } catch {
+              if (requestId === this.rankingsRequestId) {
+                ranking.error = 'ランキングを取得できませんでした。';
+              }
+            } finally {
+              if (requestId === this.rankingsRequestId)
+                ranking.isLoading = false;
+            }
+          }),
         );
       },
       /**
