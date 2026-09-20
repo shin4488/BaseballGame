@@ -105,3 +105,13 @@ test("配信する全画像とfaviconは元ファイルのバイナリを保持�
     "favicon.ico must match the source bytes"
   );
 });
+
+test("配信HTMLはJS・CSSの内容に一致するキャッシュ識別子を参照する", () => {
+  const { createHash } = require("node:crypto");
+  const html = fs.readFileSync("publish/index.html", "utf8");
+  for (const [attribute, file] of [["src", "main.js"], ["href", "./style/index.css"]]) {
+    const hash = createHash("sha256").update(fs.readFileSync(`publish/${file}`)).digest("hex");
+    assert.ok(html.includes(`${attribute}="${file}?v=${hash}"`), file);
+  }
+  assert.equal(html.includes("ver=1.0.1"), false);
+});

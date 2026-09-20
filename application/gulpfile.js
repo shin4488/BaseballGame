@@ -1,4 +1,6 @@
 const path = require('path');
+const { readFile, writeFile } = require('node:fs/promises');
+const { createHash } = require('node:crypto');
 const { series, dest, src, watch } = require('gulp');
 const { ESLint } = require('eslint');
 const webpack = require('webpack');
@@ -74,5 +76,31 @@ const startDevServer = async () => {
   watch('./src/image/**', copyAssets);
 };
 
-exports.build = series(lint, bundle, sassTask, copyAssets);
+// 内容が変わったファイルだけ参照URLを更新し、古いキャッシュとの混在を防ぐ。
+const versionAssets = async () => {
+  const htmlPath = path.join(outputPath, 'index.html');
+  let html = await readFile(htmlPath, 'utf8');
+  for (const [attribute, file] of [
+    ['src', 'main.js'],
+    ['href', './style/index.css'],
+  ]) {
+    const content = await readFile(path.join(outputPath, file));
+    const hash = createHash('sha256').update(content).digest('hex');
+    const escapedFile = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const reference = new RegExp(
+      `\\b${attribute}=(?:"${escapedFile}"|'${escapedFile}'|${escapedFile}(?=[\\s>]))`,
+      'g',
+    );
+    const updatedHtml = html.replace(
+      reference,
+      `${attribute}="${file}?v=${hash}"`,
+    );
+    if (updatedHtml === html)
+      throw new Error(`Asset reference not found: ${file}`);
+    html = updatedHtml;
+  }
+  await writeFile(htmlPath, html);
+};
+
+exports.build = series(lint, bundle, sassTask, copyAssets, versionAssets);
 exports.default = series(lint, sassTask, copyAssets, startDevServer);
