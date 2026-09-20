@@ -166,7 +166,7 @@
                     :style="hitButtonStyleComputed"
                     @click="onClickHit"
                 >
-                    <span>{{ batSwingButtonText }}</span>
+                    <span class="d-block col-6 col-lg-12">{{ batSwingButtonText }}</span>
                 </button>
             </div>
 
@@ -176,15 +176,16 @@
                     :style="playingResultStyleComputed">{{ message }}</span>
             </div>
 
-            <!-- Bootstrap標準のみ。右下で打撃ボタンの少し上に配置する -->
-            <div v-show="isGameOpened" class="position-fixed bottom-0 end-0 me-2 me-lg-5 mb-5 translate-middle-y"
+            <!-- 打撃ボタンと同じ座標を使い、重なる部分のタップもボタンへ通す -->
+            <div v-show="isGameOpened" class="position-absolute end-0 me-2 me-lg-5 mt-4 translate-middle-y pe-none"
+                :style="hitButtonStyleComputed"
                 role="status" :aria-label="`${point}点、ストライク${strikeCount}、アウト${outCount}`">
                 <div class="d-flex align-items-center gap-2 bg-dark text-white border border-secondary rounded-3 shadow-sm px-2 py-1" aria-hidden="true">
                     <div class="text-center px-1">
-                        <strong class="h5 fw-bold mb-0">{{ point }}</strong>
-                        <span class="small ms-1">{{ pointUnitText }}</span>
+                        <strong class="h4 fw-bold mb-0">{{ point }}</strong>
+                        <span class="ms-1">{{ pointUnitText }}</span>
                     </div>
-                    <div class="border-start border-secondary ps-2 small text-nowrap">
+                    <div class="border-start border-secondary ps-2 fs-5 text-nowrap">
                         <div><span class="me-2">S</span><span v-for="index in 2" :key="index"
                             :class="index <= strikeCount ? 'text-warning' : 'text-secondary'"
                             class="me-1">{{ index <= strikeCount ? '●' : '○' }}</span></div>
