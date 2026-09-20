@@ -176,25 +176,22 @@
                     :style="playingResultStyleComputed">{{ message }}</span>
             </div>
 
-            <!-- 点数・アウトカウント -->
-            <div v-show="isGameOpened"
-                class="moved-item-center result-board"
-                :style="resultBoardStyleComputed"
-            >
-                <div class="item-center">{{ point }} {{ pointUnitText }}</div>
-                <div>
-                    <span>{{ strikeText }}</span>
-                    <span class="strike"
-                        v-for="index of strikeCount"
-                        :key="index"
-                    >●</span>
-                </div>
-                <div>
-                    <span>{{ outText }}</span>
-                    <span class="out"
-                        v-for="index of outCount"
-                        :key="index"
-                    >●</span>
+            <!-- Bootstrap標準のみ。上端の得点パネルと打撃操作を避けて配置する -->
+            <div v-show="isGameOpened" class="position-fixed top-0 start-0 mt-5 ms-2"
+                role="status" :aria-label="`${point}点、ストライク${strikeCount}、アウト${outCount}`">
+                <div class="d-flex align-items-center gap-2 bg-dark text-white border border-secondary rounded-3 shadow-sm px-2 py-1" aria-hidden="true">
+                    <div class="text-center px-1">
+                        <strong class="h5 fw-bold mb-0">{{ point }}</strong>
+                        <span class="small ms-1">{{ pointUnitText }}</span>
+                    </div>
+                    <div class="border-start border-secondary ps-2 small text-nowrap">
+                        <div><span class="me-2">S</span><span v-for="index in 3" :key="index"
+                            :class="index <= strikeCount ? 'text-warning' : 'text-secondary'"
+                            class="me-1">{{ index <= strikeCount ? '●' : '○' }}</span></div>
+                        <div><span class="me-2">O</span><span v-for="index in 3" :key="index"
+                            :class="index <= outCount ? 'text-danger' : 'text-secondary'"
+                            class="me-1">{{ index <= outCount ? '●' : '○' }}</span></div>
+                    </div>
                 </div>
             </div>
         </div>

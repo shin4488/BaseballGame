@@ -20,21 +20,6 @@ $board-item-side-empty-size: 20px;
     }
 }
 
-// 結果表示欄
-.result-board {
-    background-color: white;
-    width: 78px;
-    height: 70px;
-
-    .strike {
-        color: #ffc93c;
-    }
-
-    .out {
-        color: #f55c47;
-    }
-}
-
 // 移動用（中央揃え）
 .moved-item-center {
     position: absolute;
