@@ -116,7 +116,7 @@
                     :data-out="item.value.out"
                     :data-message="item.value.message"
                     :key="index">
-                    {{ item.text }}
+                    <span class="small text-nowrap">{{ item.text }}</span>
                 </div>
             </div>
 
@@ -147,7 +147,7 @@
                 />
                 <button v-show="isGameOpened"
                     id="hitButton"
-                    class="moved-item-center btn btn-warning btn-lg"
+                    class="moved-item-center btn btn-warning btn-lg col-12 col-lg-4"
                     :style="hitButtonStyleComputed"
                     @click="onClickHit"
                 >
