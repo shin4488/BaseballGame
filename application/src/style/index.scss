@@ -6,7 +6,6 @@
 // 野球盤
 
 // 盤表示
-$board-item-side-empty-size: 20px;
 
 .point-box {
     display: flex;
@@ -14,9 +13,6 @@ $board-item-side-empty-size: 20px;
 
     .point-item {
         width: 150px;
-        border-left: $board-item-side-empty-size solid transparent;
-        border-right: $board-item-side-empty-size solid transparent;
-        height: 0;
     }
 }
 

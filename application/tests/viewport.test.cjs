@@ -57,3 +57,14 @@ for (const [width, count] of [[320,2],[390,2],[449,2],[450,3],[599,3],[600,4],[1
     assert.equal(app.boardItems[0],first);
   });
 }
+
+for (const [loginUserName, guestNumber, expected] of [[null,701,'ゲスト701'],[null,null,'ゲスト'],['山田',null,'山田'],['',null,'プレイヤー']]) {
+  test(`スコアの名前表示: ${expected}`, () => {
+    const {app} = fixture(390,844);app.loginUserName=loginUserName;app.guestNumber=guestNumber;
+    assert.equal(app.playerNameComputed,expected);
+  });
+}
+test('的は従来と同じ高さ40pxを持ち、下面の当たり判定位置を保つ',()=>{
+  const {app} = fixture(390,844);
+  assert.match(app.boardItemStyleComputed,/height: 40px/);
+});

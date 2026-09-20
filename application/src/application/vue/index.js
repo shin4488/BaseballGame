@@ -33,7 +33,7 @@ export const createVueInstance = () => {
         return `top: ${this.hitButtonYPositionComputed}px;`;
       },
       boardItemStyleComputed() {
-        return `border-bottom: ${this.ballSize}px solid;
+        return `height: ${this.ballSize}px;
           line-height: ${this.ballSize}px;`;
       },
       playingResultStyleComputed() {
@@ -73,6 +73,10 @@ export const createVueInstance = () => {
       },
       isTwoStrikeComputed() {
         return this.strikeCount === 2;
+      },
+      playerNameComputed() {
+        if (this.loginUserName !== null) return this.loginUserName || 'プレイヤー';
+        return this.guestNumber === null ? 'ゲスト' : `ゲスト${this.guestNumber}`;
       },
       /** ユーザ名表示メッセージ */
       userMessageComputed() {
