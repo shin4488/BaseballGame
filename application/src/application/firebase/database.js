@@ -6,7 +6,6 @@ import {
   startAt,
   limit,
   getDocs,
-  getCountFromServer,
   doc,
   setDoc,
   deleteDoc,
@@ -93,29 +92,18 @@ export class FireStore {
    */
   async createUserId() {
     try {
-      const randomSize = 10;
-      const zeros = [...Array(randomSize)].map(() => '0');
-
-      // ゲストユーザのユーザIDを生成
-      const guestCount = (
-        await getCountFromServer(collection(this._firestore, this._collection))
-      ).data().count;
-      const guestCountWithPadding = `${zeros.join('')}${guestCount + 1}`.slice(
-        -randomSize,
-      );
-      // ゲストIDを推測しにくくするため、ブラウザの暗号学的乱数を使う。
-      const randomBytes = window.crypto.getRandomValues(new Uint8Array(16));
-      const randomString = Array.from(randomBytes, (byte) =>
+      // 開始にFirestoreの読み書きを必要としない。記録は結果の保存時に作成する。
+      // 表示番号とID用の乱数を分け、IDには従来と同じ128ビットを使用する。
+      const randomBytes = window.crypto.getRandomValues(new Uint8Array(20));
+      const guestNumber =
+        (randomBytes.slice(16).reduce((value, byte) => value * 256 + byte, 0) %
+          999999) +
+        1;
+      const guestNumberWithPadding = String(guestNumber).padStart(10, '0');
+      const randomString = Array.from(randomBytes.slice(0, 16), (byte) =>
         byte.toString(16).padStart(2, '0'),
       ).join('');
-
-      // 一時的にゲストユーザドキュメントを生成
-      // 他のユーザとゲストユーザのユーザIDの重複を防ぐため
-      await this.upsertRanking({
-        documentId: `${guestCountWithPadding}${randomString}`,
-      });
-
-      return { guestCountWithPadding, randomString };
+      return { guestNumberWithPadding, randomString };
     } catch (error) {
       throw new Error('Create Id Error');
     }

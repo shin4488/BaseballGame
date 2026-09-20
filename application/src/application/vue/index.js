@@ -407,10 +407,10 @@ export const createVueInstance = () => {
        * ゲストユーザの作成
        */
       async createGuestUser() {
-        const { guestCountWithPadding, randomString } =
+        const { guestNumberWithPadding, randomString } =
           await FireStoreExtention.guestStore.createUserId();
-        this.guestNumber = Number(guestCountWithPadding);
-        this.guestUserId = `${guestCountWithPadding}${randomString}`;
+        this.guestNumber = Number(guestNumberWithPadding);
+        this.guestUserId = `${guestNumberWithPadding}${randomString}`;
       },
       /**
        * ゲーム開始

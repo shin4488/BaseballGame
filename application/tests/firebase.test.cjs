@@ -90,92 +90,37 @@ function database(browserCrypto) {
     }),
   };
 }
-test('ゲストIDは暗号学的乱数を使い、連番とともに保存する', async () => {
-  const d = database({
-    getRandomValues: (bytes) => {
-      bytes.fill(171);
-      return bytes;
-    },
-  });
-  d.snapshots.push(d.snapshot([]));
+test('ゲストIDを暗号学的乱数だけで発行し、Firestoreを読み書きしない', async () => {
+  const d = database({getRandomValues: bytes => {bytes.fill(171); return bytes;}});
   const id = await d.store.createUserId();
-  assert.equal(id.guestCountWithPadding, '0000000001');
-  assert.equal(d.reads.length, 0);
-  assert.equal(d.counts.length, 1);
+  assert.match(id.guestNumberWithPadding, /^\d{10}$/);
+  assert.ok(Number(id.guestNumberWithPadding) >= 1 && Number(id.guestNumberWithPadding) <= 999999);
   assert.equal(id.randomString, 'ab'.repeat(16));
-  assert.equal(
-    d.writes[0].ref.id,
-    `${id.guestCountWithPadding}${id.randomString}`,
-  );
+  assert.equal(d.reads.length + d.counts.length + d.writes.length, 0);
 });
 
-test('安全な乱数が使えない場合はIDを保存しない', async () => {
-  const d = database({
-    getRandomValues: () => {
-      throw new Error('unavailable');
-    },
+for (const byte of [0, 255]) {
+  test(`乱数バイト${byte}でも表示番号は1〜999999、IDは従来の42文字`, async () => {
+    const d = database({getRandomValues: bytes => bytes.fill(byte)});
+    const id = await d.store.createUserId();
+    assert.match(`${id.guestNumberWithPadding}${id.randomString}`, /^\d{10}[0-9a-f]{32}$/);
+    assert.ok(Number(id.guestNumberWithPadding) >= 1 && Number(id.guestNumberWithPadding) <= 999999);
   });
-  d.snapshots.push(d.snapshot([]));
-  await assert.rejects(d.store.createUserId(), {
-    message: 'Create Id Error',
-  });
+}
+
+test('安全な乱数が使えない場合はID発行を失敗させる', async () => {
+  const d = database({getRandomValues: () => {throw new Error('unavailable');}});
+  await assert.rejects(d.store.createUserId(), {message: 'Create Id Error'});
   assert.equal(d.writes.length, 0);
 });
 
-test('ゲストIDは保存が完了するまで返さない', async () => {
-  const d = database();
-  d.snapshots.push(d.snapshot([]));
-  let finishWrite;
-  d.sdk.setDoc = () =>
-    new Promise((resolve) => {
-      finishWrite = resolve;
-    });
-  let completed = false;
-  const creating = d.store.createUserId().then((id) => {
-    completed = true;
-    return id;
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(completed, false);
-  finishWrite();
-  const id = await creating;
-  assert.match(id.randomString, /^[0-9a-f]{32}$/);
-});
-
-test('ゲストIDの保存失敗は呼び出し元に伝える', async () => {
-  const d = database();
-  d.snapshots.push(d.snapshot([]));
-  d.sdk.setDoc = async () => {
-    throw new Error('permission-denied');
-  };
-  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
-});
-
-test('読み取り失敗時には乱数生成も保存も行わない', async () => {
-  let randomCalled = false;
-  const d = database({
-    getRandomValues: () => {
-      randomCalled = true;
-    },
-  });
-  d.snapshots.push(new Error('offline'));
-  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
-  assert.equal(randomCalled, false);
-  assert.equal(d.writes.length, 0);
-});
-
-test('同じ件数を読んだ同時作成でも異なるIDを保存する', async () => {
+test('同じ表示番号でも128ビットの乱数が異なればIDは異なる', async () => {
   let sequence = 0;
-  const d = database({ getRandomValues: (bytes) => bytes.fill(sequence++) });
-  d.snapshots.push(d.snapshot([]), d.snapshot([]));
-  const ids = await Promise.all([
-    d.store.createUserId(),
-    d.store.createUserId(),
-  ]);
-  assert.equal(ids[0].guestCountWithPadding, ids[1].guestCountWithPadding);
-  assert.equal(ids[0].randomString, '00'.repeat(16));
-  assert.equal(ids[1].randomString, '01'.repeat(16));
-  assert.notEqual(d.writes[0].ref.id, d.writes[1].ref.id);
+  const d = database({getRandomValues: bytes => {bytes.fill(sequence++, 0, 16); return bytes;}});
+  const [a, b] = await Promise.all([d.store.createUserId(), d.store.createUserId()]);
+  assert.equal(a.guestNumberWithPadding, b.guestNumberWithPadding);
+  assert.notEqual(a.randomString, b.randomString);
+  assert.equal(d.writes.length, 0);
 });
 
 function guestScreen(store) {
@@ -211,38 +156,29 @@ function guestScreen(store) {
   };
 }
 
-test('画面は42文字のゲストIDを保持し、保存完了後にゲームを始める', async () => {
-  const d = database({ getRandomValues: (bytes) => bytes.fill(255) });
-  d.snapshots.push(d.snapshot([]));
-  let finishWrite;
-  d.sdk.setDoc = () =>
-    new Promise((resolve) => {
-      finishWrite = resolve;
-    });
-  const screen = guestScreen(d.store);
-  const starting = screen.onClickGuestStart();
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(screen.hasStarted(), false);
-  assert.equal(screen.guestUserId, null);
-  finishWrite();
-  await starting;
-  assert.equal(screen.guestUserId, `0000000001${'ff'.repeat(16)}`);
-  assert.equal(screen.guestNumber, 1);
-  assert.equal(screen.hasStarted(), true);
-});
-
-test('画面はゲスト保存失敗時にIDを設定せずゲームを始めない', async () => {
+test('画面は42文字のゲストIDを保持し、登録通信を待たずゲームを始める', async () => {
   const d = database();
-  d.snapshots.push(d.snapshot([]));
-  d.sdk.setDoc = async () => {
-    throw new Error('offline');
-  };
   const screen = guestScreen(d.store);
   await screen.onClickGuestStart();
+  assert.match(screen.guestUserId, /^\d{10}[0-9a-f]{32}$/);
+  assert.ok(screen.guestNumber >= 1 && screen.guestNumber <= 999999);
+  assert.equal(screen.hasStarted(), true);
+  assert.equal(d.writes.length, 0);
+});
+
+test('ID生成失敗は画面で通知し、再試行できる', async () => {
+  let fail = true;
+  const d = database({getRandomValues: bytes => {if (fail) throw new Error('unavailable'); return bytes.fill(0);}});
+  const screen = guestScreen(d.store);
+  await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(), false);
+  assert.equal(screen.guestUserId, null);
   assert.match(screen.startError, /開始できませんでした/);
   assert.equal(screen.isStartingGame, false);
-  assert.equal(screen.guestUserId, null);
-  assert.equal(screen.hasStarted(), false);
+  fail = false;
+  await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(), true);
+  assert.equal(screen.startError, '');
 });
 
 test('歴代ランキングは得点降順・日時昇順の上位10件を要求する', async () => {
@@ -468,7 +404,7 @@ test('古い応答で新しいランキングを上書きしない', async () =>
   assert.equal(app.rankings.history.dataList[0].point, 20);
 });
 
-test('ゲスト開始を連打しても登録は1回、登録後に開始する', async () => {
+test('ゲスト開始を連打してもID発行は1回、発行後に開始する', async () => {
   let count = 0, finish;
   const screen = guestScreen({createUserId: () => {count++; return new Promise(r => {finish = r;});}});
   const first = screen.onClickGuestStart();
@@ -476,9 +412,23 @@ test('ゲスト開始を連打しても登録は1回、登録後に開始する'
   await screen.onClickGuestStart();
   assert.equal(count, 1);
   assert.equal(screen.hasStarted(), false);
-  finish({guestCountWithPadding: '0000000007', randomString: 'ab'.repeat(16)});
+  finish({guestNumberWithPadding: '0000000007', randomString: 'ab'.repeat(16)});
   await first;
   assert.equal(screen.hasStarted(), true);
   assert.equal(screen.guestNumber, 7);
   assert.equal(screen.isStartingGame, false);
+});
+
+test('Firestoreの利用枠が尽きてもゲスト開始は読み書きせず成功する', async () => {
+  const d = database();
+  const calls = [];
+  for (const method of ['getDocs', 'getCountFromServer', 'setDoc']) {
+    d.sdk[method] = async () => { calls.push(method); throw new Error('resource-exhausted'); };
+  }
+  const screen = guestScreen(d.store);
+  await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(), true);
+  assert.match(screen.guestUserId, /^\d{10}[0-9a-f]{32}$/);
+  assert.equal(screen.startError, '');
+  assert.deepEqual(calls, []);
 });
