@@ -23,7 +23,10 @@ function fixture({ loggedIn = false, save } = {}) {
   vm.runInNewContext(code, {
     exports,
     Vue: function (options) { return options; },
-    window: { alert: (message) => alerts.push(message) },
+    window: {
+      document: { documentElement: { clientWidth: 1280, clientHeight: 720 } },
+      alert: (message) => alerts.push(message),
+    },
     require: (name) => {
       if (name === '../firebase/auth') return { FirebaseAuthExtention: { auth } };
       if (name === '../firebase/database') return { FireStoreExtention: {

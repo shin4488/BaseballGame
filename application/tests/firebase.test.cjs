@@ -183,6 +183,7 @@ function guestScreen(store) {
     },
     undefined,
     {
+      window: { document: { documentElement: { clientWidth: 1280, clientHeight: 720 } } },
       Vue: function (options) {
         return options;
       },

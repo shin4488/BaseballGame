@@ -36,11 +36,11 @@ export const createVueInstance = () => {
           line-height: ${this.ballSize}px;`;
       },
       playingResultStyleComputed() {
-        return `top: ${window.document.documentElement.clientHeight / 2}px;`;
+        return `top: ${this.viewportHeight / 2}px;`;
       },
       /** マウンドの初期Y座標 */
       moundYPositionComputed() {
-        return window.document.documentElement.clientHeight / 5;
+        return this.viewportHeight / 5;
       },
       /** ボールの初期Y座標 */
       ballYPositionComputed() {
@@ -53,10 +53,7 @@ export const createVueInstance = () => {
       },
       /** バットの初期Y座標 */
       batYPositionComputed() {
-        return (
-          window.document.documentElement.clientHeight -
-          this.batInitHeight * 1.5
-        );
+        return this.viewportHeight - this.batInitHeight * 1.5;
       },
       /** 打つボタンの初期Y座標 */
       hitButtonYPositionComputed() {
@@ -69,25 +66,9 @@ export const createVueInstance = () => {
       isBlankMessage() {
         return this.message === '';
       },
-      /** ユーザの使用端末による盤の数 */
+      /** 表示幅に収まる盤の数 */
       boardItemCounterComputed() {
-        const boardItemCounter = {
-          iPhone: 2,
-          iPad: 3,
-          Android: 2,
-          Mobile: 2,
-          other: 4,
-        };
-        const userAgent = window.navigator.userAgent;
-        return userAgent.indexOf('iPhone') > 0
-          ? boardItemCounter.iPhone
-          : userAgent.indexOf('iPad') > 0
-          ? boardItemCounter.iPad
-          : userAgent.indexOf('Android') > 0
-          ? boardItemCounter.Android
-          : userAgent.indexOf('Mobile') > 0
-          ? boardItemCounter.Mobile
-          : boardItemCounter.other;
+        return Math.max(2, Math.min(4, Math.floor(this.viewportWidth / 150)));
       },
       isTwoStrikeComputed() {
         return this.strikeCount === 2;
@@ -116,6 +97,8 @@ export const createVueInstance = () => {
       },
     },
     data: {
+      viewportWidth: window.document.documentElement.clientWidth,
+      viewportHeight: window.document.documentElement.clientHeight,
       guestNumber: null,
       guestUserId: null,
       rankings: {
@@ -184,6 +167,7 @@ export const createVueInstance = () => {
       isSavingResult: false,
     },
     async mounted() {
+      window.addEventListener('resize', this.updateViewport);
       this.initializeTopMenuData();
       this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
       // 未ログイン時はゲストユーザを使用
@@ -196,6 +180,9 @@ export const createVueInstance = () => {
       }, this.messageShowingInterval);
       this.setBoardItems();
     },
+    beforeDestroy() {
+      window.removeEventListener('resize', this.updateViewport);
+    },
     watch: {
       message() {
         // 1球ごとの試合中のメッセージは投球前に消す
@@ -207,6 +194,20 @@ export const createVueInstance = () => {
       },
     },
     methods: {
+      updateViewport() {
+        this.viewportWidth = window.document.documentElement.clientWidth;
+        this.viewportHeight = window.document.documentElement.clientHeight;
+        // 既存の的を保ちながら、画面幅に合う個数に調整する。
+        this.boardItems = this.boardItems.slice(
+          0,
+          this.boardItemCounterComputed,
+        );
+        while (this.boardItems.length < this.boardItemCounterComputed) {
+          this.boardItems.push(
+            boardItems[Math.floor(Math.random() * boardItems.length)],
+          );
+        }
+      },
       /**
        * ゲストでスタートボタン押下処理
        */
@@ -581,7 +582,7 @@ export const createVueInstance = () => {
             // ファール -> ストライク（アウトにはならない）
             const isFaul =
               ballPosition.left <= 0 ||
-              ballPosition.right >= window.document.documentElement.clientWidth;
+              ballPosition.right >= this.viewportWidth;
             if (isFaul) {
               this.strikeCount = this.isTwoStrikeComputed
                 ? 2
