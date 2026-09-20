@@ -86,10 +86,18 @@ const versionAssets = async () => {
   ]) {
     const content = await readFile(path.join(outputPath, file));
     const hash = createHash('sha256').update(content).digest('hex');
-    html = html.replace(
-      `${attribute}="${file}"`,
+    const escapedFile = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const reference = new RegExp(
+      `\\b${attribute}=(?:"${escapedFile}"|'${escapedFile}'|${escapedFile}(?=[\\s>]))`,
+      'g',
+    );
+    const updatedHtml = html.replace(
+      reference,
       `${attribute}="${file}?v=${hash}"`,
     );
+    if (updatedHtml === html)
+      throw new Error(`Asset reference not found: ${file}`);
+    html = updatedHtml;
   }
   await writeFile(htmlPath, html);
 };
