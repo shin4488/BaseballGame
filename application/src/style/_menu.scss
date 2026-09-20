@@ -91,6 +91,7 @@ $radius: 1.25rem;
         border-color: $field;
         &:hover, &:focus { color: white; background: $field; }
     }
+    .menu-account { margin-top: 1rem; }
     .menu-link {
         color: $field;
         &:hover { color: $field-hover; text-decoration: underline; }
@@ -166,4 +167,31 @@ $radius: 1.25rem;
     }
     .result-headline { font-size: clamp(1.35rem, 3vw, 2rem); overflow-wrap: anywhere; }
     .result-actions { border-top: 1px solid $line; margin-top: 2rem; padding-top: 2rem; }
+}
+
+// PCは上位10件を一度に見渡せる密度にする。高さに合わせて余白を調整し、
+// 極端に低い画面や拡大表示では既存のスクロールを残して操作の欠落を防ぐ。
+@media (min-width: 992px) {
+    .game-menu {
+        padding: clamp(.75rem, 2vh, 2rem);
+
+        .menu-surface:not(.menu-surface-result) {
+            padding: clamp(.75rem, 1.5vh, 1.5rem);
+        }
+        .menu-hero {
+            padding: clamp(.5rem, 1.5vh, 1.5rem) 0;
+            h1 { font-size: clamp(2rem, 4vh, 3rem); }
+            p { margin-top: .5rem; }
+        }
+        .menu-account { margin-top: .25rem; padding-block: .25rem; }
+        .menu-start-actions .btn { padding: .5rem 1rem; font-size: 1rem; }
+        .ranking-card { padding: clamp(.75rem, 1.5vh, 1.25rem); }
+        .ranking-table {
+            th, td { padding: clamp(.125rem, .4vh, .4rem) .35rem; }
+            .ranking-date { width: 128px; }
+        }
+        .rank-number { width: 1.5rem; height: 1.5rem; }
+        .player-avatar { width: 24px; height: 24px; }
+        .ranking-empty { min-height: 220px; }
+    }
 }

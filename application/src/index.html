@@ -41,7 +41,7 @@
                     <section v-show="isSelectingModeShownComputed" aria-labelledby="menu-title">
                         <div class="menu-hero text-center">
                             <h1 id="menu-title">さあ、プレイボール。</h1>
-                            <p class="mb-4">タイミングを合わせて、<wbr>ハイスコアを目指そう。</p>
+                            <p class="mb-3">タイミングを合わせて、<wbr>ハイスコアを目指そう。</p>
                             <div class="menu-start-actions d-flex flex-wrap justify-content-center gap-3 mx-auto">
                                 <button type="button" class="btn btn-field btn-lg" @click="onClickGuestStart">
                                     <i class="bi bi-play-fill me-2" aria-hidden="true"></i>{{ guestButtonText }}
@@ -50,7 +50,7 @@
                                     <i class="bi bi-person me-2" aria-hidden="true"></i>{{ userStartButtonTextComputed }}
                                 </button>
                             </div>
-                            <button v-show="loginUserName !== null" type="button" class="btn menu-link mt-3"
+                            <button v-show="loginUserName !== null" type="button" class="btn menu-link menu-account"
                                 @click="onClickChangeAccount">{{ changeAccountButtonText }}</button>
                         </div>
 
@@ -58,7 +58,7 @@
                             <section v-for="(item, rankingKey) in rankings" :key="rankingKey" class="col-12 col-lg-6"
                                 :aria-labelledby="`ranking-${rankingKey}`">
                                 <div class="ranking-card h-100">
-                                    <h2 :id="`ranking-${rankingKey}`" class="h5 fw-bold mb-4">
+                                    <h2 :id="`ranking-${rankingKey}`" class="h5 fw-bold mb-3">
                                         <i :class="rankingKey === 'thisWeek' ? 'bi bi-trophy' : 'bi bi-award'" class="me-2" aria-hidden="true"></i>{{ item.titleText }}
                                     </h2>
                                     <div v-if="item.dataList.length === 0" class="ranking-empty text-center">
