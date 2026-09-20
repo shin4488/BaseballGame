@@ -185,10 +185,10 @@
                         <span class="small ms-1">{{ pointUnitText }}</span>
                     </div>
                     <div class="border-start border-secondary ps-2 small text-nowrap">
-                        <div><span class="me-2">S</span><span v-for="index in 3" :key="index"
+                        <div><span class="me-2">S</span><span v-for="index in 2" :key="index"
                             :class="index <= strikeCount ? 'text-warning' : 'text-secondary'"
                             class="me-1">{{ index <= strikeCount ? '●' : '○' }}</span></div>
-                        <div><span class="me-2">O</span><span v-for="index in 3" :key="index"
+                        <div><span class="me-2">O</span><span v-for="index in 2" :key="index"
                             :class="index <= outCount ? 'text-danger' : 'text-secondary'"
                             class="me-1">{{ index <= outCount ? '●' : '○' }}</span></div>
                     </div>
