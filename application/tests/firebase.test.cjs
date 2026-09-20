@@ -27,7 +27,10 @@ function load(
   });
   return exports;
 }
-function database(browserCrypto) {
+function database(browserCrypto, initialCounter = 700) {
+  let counterData = initialCounter === null ? null : {lastNumber: initialCounter};
+  let revision = 0;
+  const counterWrites = [], transactionReads = [];
   const reads = [],
     writes = [],
     deletes = [],
@@ -47,6 +50,30 @@ function database(browserCrypto) {
     }),
     startAt: (...values) => ({ kind: 'start', values }),
     limit: (value) => ({ kind: 'limit', value }),
+    getDocsFromServer: async (query) => sdk.getDocs(query),
+    runTransaction: async (_db, callback) => {
+      // Web SDKの楽観的排他制御を再現し、競合時はコールバックを再実行する。
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const readRevision = revision;
+        const readData = counterData;
+        let pending;
+        const result = await callback({
+          get: async (ref) => {
+            transactionReads.push(ref);
+            return {exists: () => readData !== null, data: () => readData};
+          },
+          set: (ref, data) => { pending = {ref, data}; },
+        });
+        if (readRevision !== revision) continue;
+        if (pending) {
+          counterData = pending.data;
+          revision++;
+          counterWrites.push(pending);
+        }
+        return result;
+      }
+      throw new Error('aborted');
+    },
     getCountFromServer: async (query) => {
       counts.push(query);
       const next = snapshots.shift();
@@ -84,43 +111,74 @@ function database(browserCrypto) {
     writes,
     deletes,
     snapshots,
+    counterWrites,
+    transactionReads,
     snapshot: (items) => ({
       size: items.length,
       docs: items.map((data) => ({ data: () => data })),
     }),
   };
 }
-test('ゲストIDを暗号学的乱数だけで発行し、Firestoreを読み書きしない', async () => {
-  const d = database({getRandomValues: bytes => {bytes.fill(171); return bytes;}});
-  const id = await d.store.createUserId();
-  assert.match(id.guestNumberWithPadding, /^\d{10}$/);
-  assert.ok(Number(id.guestNumberWithPadding) >= 1 && Number(id.guestNumberWithPadding) <= 999999);
-  assert.equal(id.randomString, 'ab'.repeat(16));
+test('ゲスト番号は701、702と連番になり、件数集計や全件取得をしない', async () => {
+  const d = database({getRandomValues: bytes => bytes.fill(171)});
+  const first = await d.store.createUserId();
+  const second = await d.store.createUserId();
+  assert.equal(first.guestNumberWithPadding, '0000000701');
+  assert.equal(second.guestNumberWithPadding, '0000000702');
+  assert.equal(first.randomString, 'ab'.repeat(16));
   assert.equal(d.reads.length + d.counts.length + d.writes.length, 0);
+  assert.equal(d.counterWrites.length, 2);
+  assert.equal(d.counterWrites[0].ref.id, '_sequence');
+  assert.deepEqual(Object.keys(d.counterWrites[0].data), ['lastNumber']);
 });
 
-for (const byte of [0, 255]) {
-  test(`乱数バイト${byte}でも表示番号は1〜999999、IDは従来の42文字`, async () => {
-    const d = database({getRandomValues: bytes => bytes.fill(byte)});
-    const id = await d.store.createUserId();
-    assert.match(`${id.guestNumberWithPadding}${id.randomString}`, /^\d{10}[0-9a-f]{32}$/);
-    assert.ok(Number(id.guestNumberWithPadding) >= 1 && Number(id.guestNumberWithPadding) <= 999999);
-  });
-}
-
-test('安全な乱数が使えない場合はID発行を失敗させる', async () => {
-  const d = database({getRandomValues: () => {throw new Error('unavailable');}});
-  await assert.rejects(d.store.createUserId(), {message: 'Create Id Error'});
-  assert.equal(d.writes.length, 0);
+test('初回は過去の20文字IDの最大番号を1件だけ取得して引き継ぐ', async () => {
+  const d = database(undefined, null);
+  d.snapshots.push(d.snapshot([{userId: '0000000700abcdefghij'}]));
+  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000000701');
+  await d.store.createUserId();
+  assert.equal(d.reads.length, 1);
+  assert.deepEqual(d.reads[0].constraints, [{kind:'order',field:'userId',direction:'desc'},{kind:'limit',value:1}]);
 });
-
-test('同じ表示番号でも128ビットの乱数が異なればIDは異なる', async () => {
-  let sequence = 0;
-  const d = database({getRandomValues: bytes => {bytes.fill(sequence++, 0, 16); return bytes;}});
-  const [a, b] = await Promise.all([d.store.createUserId(), d.store.createUserId()]);
-  assert.equal(a.guestNumberWithPadding, b.guestNumberWithPadding);
-  assert.notEqual(a.randomString, b.randomString);
-  assert.equal(d.writes.length, 0);
+test('データがない場合は1から開始する', async () => {
+  const d = database(undefined, null);d.snapshots.push(d.snapshot([]));
+  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000000001');
+});
+test('保存済みのランダム番号があれば、その最大番号も再利用しない', async () => {
+  const d = database(undefined, null);d.snapshots.push(d.snapshot([{userId:'0000932456'+'ab'.repeat(16)}]));
+  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000932457');
+});
+test('同時に20人が開始しても競合を再試行し、番号が重複しない', async () => {
+  const d = database();
+  const ids = await Promise.all(Array.from({length:20},()=>d.store.createUserId()));
+  assert.deepEqual(ids.map(id=>Number(id.guestNumberWithPadding)).sort((a,b)=>a-b),Array.from({length:20},(_,i)=>701+i));
+  assert.equal(d.counterWrites.length,20);
+  assert.ok(d.transactionReads.length > 20,'競合による再試行を通る');
+});
+test('初回の同時開始でもカウンターを上書きせず連番を発行する', async () => {
+  const d = database(undefined,null);
+  d.snapshots.push(d.snapshot([{userId:'0000000700abcdefghij'}]),d.snapshot([{userId:'0000000700abcdefghij'}]));
+  const ids=await Promise.all([d.store.createUserId(),d.store.createUserId()]);
+  assert.deepEqual(ids.map(id=>Number(id.guestNumberWithPadding)).sort(),[701,702]);
+});
+for(const value of [-1,1.5,'700',NaN,9999999999])test(`不正または上限のカウンター${value}は更新しない`,async()=>{
+  const d=database(undefined,value);
+  await assert.rejects(d.store.createUserId(),{message:'Create Id Error'});
+  assert.equal(d.counterWrites.length,0);
+});
+test('10桁の最終番号でもIDは42文字を維持する',async()=>{
+  const d=database(undefined,9999999998);
+  const id=await d.store.createUserId();
+  assert.match(id.guestNumberWithPadding+id.randomString,/^9999999999[0-9a-f]{32}$/);
+});
+test('安全な乱数が使えない場合はカウンターも進めない',async()=>{
+  const d=database({getRandomValues:()=>{throw new Error('unavailable');}});
+  await assert.rejects(d.store.createUserId(),{message:'Create Id Error'});
+  assert.equal(d.transactionReads.length,0);assert.equal(d.counterWrites.length,0);
+});
+test('初回の既存IDが不正な場合は1からやり直さず失敗する',async()=>{
+  const d=database(undefined,null);d.snapshots.push(d.snapshot([{userId:'broken'}]));
+  await assert.rejects(d.store.createUserId());assert.equal(d.counterWrites.length,0);
 });
 
 function guestScreen(store) {
@@ -156,7 +214,7 @@ function guestScreen(store) {
   };
 }
 
-test('画面は42文字のゲストIDを保持し、登録通信を待たずゲームを始める', async () => {
+test('画面は連番発行後に42文字のゲストIDを保持してゲームを始める', async () => {
   const d = database();
   const screen = guestScreen(d.store);
   await screen.onClickGuestStart();
@@ -419,16 +477,17 @@ test('ゲスト開始を連打してもID発行は1回、発行後に開始す�
   assert.equal(screen.isStartingGame, false);
 });
 
-test('Firestoreの利用枠が尽きてもゲスト開始は読み書きせず成功する', async () => {
-  const d = database();
-  const calls = [];
-  for (const method of ['getDocs', 'getCountFromServer', 'setDoc']) {
-    d.sdk[method] = async () => { calls.push(method); throw new Error('resource-exhausted'); };
-  }
-  const screen = guestScreen(d.store);
-  await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(), true);
-  assert.match(screen.guestUserId, /^\d{10}[0-9a-f]{32}$/);
-  assert.equal(screen.startError, '');
-  assert.deepEqual(calls, []);
+test('発番通信に失敗した場合はランダム番号で開始せず、再試行できる',async()=>{
+  const d=database();const transaction=d.sdk.runTransaction;
+  d.sdk.runTransaction=async()=>{throw new Error('resource-exhausted');};
+  const screen=guestScreen(d.store);await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(),false);assert.equal(screen.guestUserId,null);
+  assert.match(screen.startError,/開始できませんでした/);assert.equal(d.counterWrites.length,0);
+  d.sdk.runTransaction=transaction;await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(),true);assert.equal(screen.guestNumber,701);assert.equal(screen.startError,'');
+});
+test('同じゲストで再度開始する場合は番号を再発行しない',async()=>{
+  const d=database();const screen=guestScreen(d.store);
+  await screen.onClickGuestStart();const first=screen.guestUserId;
+  await screen.onClickGuestStart();assert.equal(screen.guestUserId,first);assert.equal(d.counterWrites.length,1);
 });
