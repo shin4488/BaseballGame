@@ -68,3 +68,13 @@ test('的は従来と同じ高さ40pxを持ち、下面の当たり判定位置�
   const {app} = fixture(390,844);
   assert.match(app.boardItemStyleComputed,/height: 40px/);
 });
+
+
+test('番号取得中は未発番の番号やnullを名前に表示しない', () => {
+  const {app} = fixture(390,844);
+  app.loginUserName = null;
+  app.guestNumber = null;
+  app.isPreparingGuest = true;
+  assert.equal(app.playerNameComputed, '番号を取得中…');
+  assert.doesNotMatch(app.userMessageComputed, /null/);
+});
