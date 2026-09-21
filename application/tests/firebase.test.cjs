@@ -397,10 +397,10 @@ for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
   });
 }
 
-function rankingScreen(sources) {
+function rankingScreen(sources, loginUserName = null) {
   const { createVueInstance } = load('src/application/vue/index.js', {
     '../vector/vector2': {},
-    '../firebase/auth': { FirebaseAuthExtention: {auth: {getLoginUserName: () => null}} },
+    '../firebase/auth': { FirebaseAuthExtention: {auth: {getLoginUserName: () => loginUserName}} },
     '../firebase/database': { FireStoreExtention: sources },
     './process': {}, './appConfig': {boardItems: []}, 'regenerator-runtime/runtime.js': {},
   }, undefined, {
@@ -413,16 +413,21 @@ function rankingScreen(sources) {
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-test('遅い週間ランキングを待たず歴代を表示し、初回表示でゲストを作らない', async () => {
-  let finishHistory, finishWeek;
+test('番号と週間ランキングが取得中でも歴代を表示し、番号が届けば開始画面に保持する', async () => {
+  let finishHistory, finishWeek, finishGuest;
   const {app, options} = rankingScreen({
     getRankingHistory: () => new Promise(r => {finishHistory = r;}),
     getRankingThisWeek: () => new Promise(r => {finishWeek = r;}),
-    guestStore: {createUserId: () => {throw new Error('Initial guest creation is forbidden');}},
+    guestStore: {createUserId: () => new Promise(r => {finishGuest = r;})},
   });
   options.mounted.call(app);
   assert.equal(app.shouldShowInitImage, false);
   assert.equal(app.guestUserId, null);
+  assert.equal(app.isPreparingGuest, true);
+  finishGuest({guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)});
+  await flush();
+  assert.equal(app.guestNumber, 701);
+  assert.equal(app.isPreparingGuest, false);
   assert.equal(typeof finishWeek, 'function');
   finishHistory([{point: 21}]);
   await flush();
@@ -490,4 +495,56 @@ test('同じゲストで再度開始する場合は番号を再発行しない',
   const d=database();const screen=guestScreen(d.store);
   await screen.onClickGuestStart();const first=screen.guestUserId;
   await screen.onClickGuestStart();assert.equal(screen.guestUserId,first);assert.equal(d.counterWrites.length,1);
+});
+
+
+test('開始画面の発番中に開始を押しても番号を二重発行しない', async () => {
+  let calls = 0, finish;
+  const screen = guestScreen({createUserId: () => {
+    calls++;
+    return new Promise(resolve => {finish = resolve;});
+  }});
+  const preparation = screen.createGuestUser();
+  const start = screen.onClickGuestStart();
+  await flush();
+  assert.equal(calls, 1);
+  assert.equal(screen.hasStarted(), false);
+  finish({guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)});
+  await Promise.all([preparation, start]);
+  assert.equal(screen.guestNumber, 701);
+  assert.equal(screen.hasStarted(), true);
+  await screen.onClickGuestStart();
+  assert.equal(calls, 1);
+});
+
+test('初回発番の失敗は画面に表示し、取得処理をやり直せる', async () => {
+  let fail = true;
+  const {app, options} = rankingScreen({
+    getRankingHistory: async () => [], getRankingThisWeek: async () => [],
+    guestStore: {createUserId: async () => {
+      if (fail) throw new Error('offline');
+      return {guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)};
+    }},
+  });
+  options.mounted.call(app);
+  await flush();
+  assert.match(app.startError, /ゲスト番号を取得できませんでした/);
+  assert.equal(app.isPreparingGuest, false);
+  assert.equal(app.guestUserId, null);
+  fail = false;
+  await app.createGuestUser();
+  assert.equal(app.guestNumber, 701);
+});
+
+test('ログイン済みの開始画面ではゲスト番号を発行しない', async () => {
+  let calls = 0;
+  const {app, options} = rankingScreen({
+    getRankingHistory: async () => [], getRankingThisWeek: async () => [],
+    guestStore: {createUserId: async () => {calls++;}},
+  }, '山田');
+  options.mounted.call(app);
+  await flush();
+  assert.equal(app.loginUserName, '山田');
+  assert.equal(calls, 0);
+  assert.equal(app.isPreparingGuest, false);
 });

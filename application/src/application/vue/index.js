@@ -11,6 +11,7 @@ import { boardItems, guestImagePath } from './appConfig';
 import 'regenerator-runtime/runtime.js';
 
 export const createVueInstance = () => {
+  let guestCreation = null;
   return new Vue({
     el: '#app',
     computed: {
@@ -76,15 +77,12 @@ export const createVueInstance = () => {
       },
       playerNameComputed() {
         if (this.loginUserName !== null) return this.loginUserName || 'プレイヤー';
-        return this.guestNumber === null ? 'ゲスト' : `ゲスト${this.guestNumber}`;
+        if (this.guestNumber !== null) return `ゲスト${this.guestNumber}`;
+        return this.isPreparingGuest ? '番号を取得中…' : 'ゲスト';
       },
       /** ユーザ名表示メッセージ */
       userMessageComputed() {
-        const userName =
-          this.loginUserName === null
-            ? `ゲスト${this.guestNumber}`
-            : this.loginUserName;
-        return `こんにちは ${userName} さん`;
+        return `こんにちは ${this.playerNameComputed} さん`;
       },
       /** 得点は結果画面で独立して表示する */
       resultHeadlineComputed() {
@@ -102,6 +100,7 @@ export const createVueInstance = () => {
       },
     },
     data: {
+      isPreparingGuest: false,
       viewportWidth: window.document.documentElement.clientWidth,
       viewportHeight: window.document.documentElement.clientHeight,
       rankingsRequestId: 0,
@@ -184,6 +183,14 @@ export const createVueInstance = () => {
       this.shouldShowInitImage = false;
       this.initializeTopMenuData();
       this.setBoardItems();
+      if (this.loginUserName === null) {
+        this.createGuestUser().catch(() => {
+          if (this.loginUserName === null) {
+            this.startError =
+              'ゲスト番号を取得できませんでした。「ゲストとして開始」で再試行できます。';
+          }
+        });
+      }
     },
     beforeDestroy() {
       window.removeEventListener('resize', this.updateViewport);
@@ -249,9 +256,6 @@ export const createVueInstance = () => {
           }
         }
 
-        // TODO:ゲストユーザでプレイしない場合は画面表示時に作成したゲストユーザを削除
-        this.guestNumber = null;
-        this.guestUserId = null;
         this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
         this.executeBaseballGame();
       },
@@ -267,9 +271,6 @@ export const createVueInstance = () => {
           return;
         }
 
-        // TODO:ゲストユーザでプレイしない場合は画面表示時に作成したゲストユーザを削除
-        this.guestNumber = null;
-        this.guestUserId = null;
         this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
         this.executeBaseballGame();
       },
@@ -412,10 +413,21 @@ export const createVueInstance = () => {
        * ゲストユーザの作成
        */
       async createGuestUser() {
-        const { guestNumberWithPadding, randomString } =
-          await FireStoreExtention.guestStore.createUserId();
-        this.guestNumber = Number(guestNumberWithPadding);
-        this.guestUserId = `${guestNumberWithPadding}${randomString}`;
+        if (this.guestUserId !== null) return;
+        // 初回表示と開始ボタンが重なっても、同じ発番を待つ。
+        if (guestCreation === null) {
+          this.isPreparingGuest = true;
+          guestCreation = (async () => {
+            const { guestNumberWithPadding, randomString } =
+              await FireStoreExtention.guestStore.createUserId();
+            this.guestNumber = Number(guestNumberWithPadding);
+            this.guestUserId = `${guestNumberWithPadding}${randomString}`;
+          })().finally(() => {
+            this.isPreparingGuest = false;
+            guestCreation = null;
+          });
+        }
+        await guestCreation;
       },
       /**
        * ゲーム開始
