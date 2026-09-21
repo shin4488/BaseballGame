@@ -133,8 +133,8 @@
             <!-- ボックス -->
             <div class="point-box">
                 <!-- クラス名を処理内で使用しているため、クラス名を変更しない -->
-                <div class="point-item item-center"
-                    :style="`${boardItemStyleComputed} border-bottom-color: ${item.color};`"
+                <div class="point-item d-flex align-items-center justify-content-center rounded-bottom text-dark fw-bold"
+                    :style="`${boardItemStyleComputed} background-color: ${item.color};`"
                     v-for="(item, index) in boardItems"
                     :data-point="item.value.point"
                     :data-out="item.value.out"
@@ -188,8 +188,10 @@
             <!-- 打撃ボタンの上端を基準に、スコアを8px上へ配置する -->
             <div v-show="isGameOpened" class="position-absolute end-0 me-2 me-lg-5 pe-none"
                 :style="hitButtonStyleComputed"
-                role="status" :aria-label="`${point}点、ストライク${strikeCount}、アウト${outCount}`">
+                role="status" :aria-label="`${playerNameComputed}、${point}点、ストライク${strikeCount}、アウト${outCount}`">
                 <div class="position-absolute bottom-0 end-0 mb-2 d-flex align-items-center gap-2 bg-dark text-white text-nowrap border border-secondary rounded-3 shadow-sm px-2 py-1" aria-hidden="true">
+                    <span class="position-absolute bottom-100 start-0 w-100 d-block text-truncate text-end small text-white pb-1"
+                        :title="playerNameComputed">{{ playerNameComputed }}</span>
                     <div class="text-center px-1">
                         <strong class="h4 fw-bold mb-0">{{ point }}</strong>
                         <span class="ms-1">{{ pointUnitText }}</span>
