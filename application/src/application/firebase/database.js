@@ -6,6 +6,8 @@ import {
   startAt,
   limit,
   getDocs,
+  getDocsFromServer,
+  runTransaction,
   doc,
   setDoc,
   deleteDoc,
@@ -92,17 +94,46 @@ export class FireStore {
    */
   async createUserId() {
     try {
-      // 開始にFirestoreの読み書きを必要としない。記録は結果の保存時に作成する。
-      // 表示番号とID用の乱数を分け、IDには従来と同じ128ビットを使用する。
-      const randomBytes = window.crypto.getRandomValues(new Uint8Array(20));
-      const guestNumber =
-        (randomBytes.slice(16).reduce((value, byte) => value * 256 + byte, 0) %
-          999999) +
-        1;
-      const guestNumberWithPadding = String(guestNumber).padStart(10, '0');
-      const randomString = Array.from(randomBytes.slice(0, 16), (byte) =>
+      // IDの推測を防ぐ乱数は維持し、表示番号だけを共有カウンターで発番する。
+      const randomBytes = window.crypto.getRandomValues(new Uint8Array(16));
+      const randomString = Array.from(randomBytes, (byte) =>
         byte.toString(16).padStart(2, '0'),
       ).join('');
+      const counterRef = doc(this._firestore, this._collection, '_sequence');
+      const guestNumber = await runTransaction(this._firestore, async (tx) => {
+        const counter = await tx.get(counterRef);
+        let lastNumber;
+        if (counter.exists()) {
+          lastNumber = counter.data().lastNumber;
+        } else {
+          // 初回のみ、過去の10桁ゼロ埋めIDの最大番号を1件取得する。
+          // 件数から発番しないため、過去の記録が削除されても番号を再利用しない。
+          const latest = await getDocsFromServer(
+            query(
+              collection(this._firestore, this._collection),
+              orderBy(FireStoreColumn.userId, 'desc'),
+              limit(1),
+            ),
+          );
+          const latestId = latest.docs[0]?.data()[FireStoreColumn.userId];
+          if (latestId !== undefined && !/^\d{10}.+$/.test(latestId)) {
+            throw new Error('Invalid guest ID');
+          }
+          lastNumber = latestId === undefined ? 0 : Number(latestId.slice(0, 10));
+        }
+        if (
+          !Number.isSafeInteger(lastNumber) ||
+          lastNumber < 0 ||
+          lastNumber >= 9999999999
+        ) {
+          throw new Error('Invalid guest sequence');
+        }
+        const nextNumber = lastNumber + 1;
+        // ランキング用フィールドを持たせず、ランキングの検索対象から除外する。
+        tx.set(counterRef, { lastNumber: nextNumber });
+        return nextNumber;
+      });
+      const guestNumberWithPadding = String(guestNumber).padStart(10, '0');
       return { guestNumberWithPadding, randomString };
     } catch (error) {
       throw new Error('Create Id Error');
