@@ -25,9 +25,6 @@ export class FireStoreColumn {
   static lastUpdated = 'lastUpdated';
 }
 
-/**
- * firestoreのCRUD処理クラス
- */
 export class FireStore {
   _firestore;
   _collection;
@@ -37,18 +34,13 @@ export class FireStore {
     this._collection = collection;
   }
 
-  // データ検索
-  /**
-   * 今週のランキング検索
-   * @returns
-   */
   async getRankingThisWeek() {
     try {
       const basisDate = new Date();
       basisDate.setDate(basisDate.getDate() - 7);
 
-      // 7日前以降を取得し、全体を得点順に並べてから上位10件に絞る。
-      // 日付順を得点順より優先してしまっているため、limitを付けると日付が最近でランキング上位者が取得されなくなる
+      // 日付順のクエリで先に10件へ絞ると、週間の得点上位を取りこぼす。
+      // ゲストとログインユーザーの結果を合わせ、得点順へ並べ直してから上位10件を選ぶ。
       const guests = await getDocs(
         query(
           collection(this._firestore, this._collection),
@@ -66,10 +58,6 @@ export class FireStore {
     }
   }
 
-  /**
-   * 歴代のランキング検索
-   * @returns
-   */
   async getRankingHistory() {
     try {
       const guests = await getDocs(
@@ -172,9 +160,6 @@ export class FireStore {
   }
 }
 
-/**
- * firestoreのCRUD処理の拡張クラス
- */
 export class FireStoreExtention {
   static loginUserStore;
   static guestStore;
@@ -187,9 +172,6 @@ export class FireStoreExtention {
     FireStoreExtention.loginUserStore = new FireStore(firestore, 'loginUsers');
   }
 
-  /**
-   * 歴代のランキングの取得
-   */
   static async getRankingHistory() {
     const [guestRankingList, loginUserRankingList] = await Promise.all([
       FireStoreExtention.guestStore.getRankingHistory(),
@@ -203,9 +185,6 @@ export class FireStoreExtention {
     return sortedRankingTop10List;
   }
 
-  /**
-   * 今週のランキングの取得
-   */
   static async getRankingThisWeek() {
     const [guestRankingList, loginUserRankingList] = await Promise.all([
       FireStoreExtention.guestStore.getRankingThisWeek(),
@@ -224,8 +203,7 @@ export class FireStoreExtention {
    * @param {*} rankingList
    */
   static sortByRankingLastUpdated(rankingList) {
-    // 参照渡しによる上書きを防ぐ
-    // ソートの優先順位を「得点」「最終更新日時」とする
+    // 同点では先に記録した人を上位にする。後段の安定ソートでも日時順を保つため、先に日時で並べる。
     const sortedRankingList = [...rankingList]
       .sort(
         (next, previous) =>
