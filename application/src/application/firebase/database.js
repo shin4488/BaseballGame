@@ -107,7 +107,8 @@ export class FireStore {
           if (latestId !== undefined && !/^\d{10}.+$/.test(latestId)) {
             throw new Error('Invalid guest ID');
           }
-          lastNumber = latestId === undefined ? 0 : Number(latestId.slice(0, 10));
+          lastNumber =
+            latestId === undefined ? 0 : Number(latestId.slice(0, 10));
         }
         if (
           !Number.isSafeInteger(lastNumber) ||
