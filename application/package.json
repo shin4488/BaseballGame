@@ -41,5 +41,8 @@
   },
   "engines": {
     "node": "24.x"
+  },
+  "resolutions": {
+    "**/@grpc/grpc-js": "1.14.5"
   }
 }
