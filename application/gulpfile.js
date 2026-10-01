@@ -19,20 +19,12 @@ const outputPath = path.resolve(__dirname, isDevelopment ? 'dist' : 'publish');
 const srcPath = path.resolve(__dirname, 'src');
 
 // 画像は文字コード変換せずにコピーし、全ファイルの書き込み完了を待つ。
-const copyAssets = async () => {
-  await Promise.all([
-    finished(
-      src(path.resolve(srcPath, 'image', 'favicon.ico'), {
-        encoding: false,
-      }).pipe(dest(outputPath, { encoding: false })),
+const copyAssets = () =>
+  finished(
+    src(path.resolve(srcPath, 'image/**'), { encoding: false }).pipe(
+      dest(path.resolve(outputPath, 'image'), { encoding: false }),
     ),
-    finished(
-      src(path.resolve(srcPath, 'image/**'), { encoding: false }).pipe(
-        dest(path.resolve(outputPath, 'image'), { encoding: false }),
-      ),
-    ),
-  ]);
-};
+  );
 
 const sassTask = () =>
   src('./src/style/*.scss')
