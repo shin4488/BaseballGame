@@ -1,45 +1,14 @@
 // 開始・結果画面の落ち着いた背景色（芝生はBootstrap標準のbg-success）
 .bg-field {
-    background-color: #0a3d2d;
+  background-color: #0a3d2d;
 }
 
 // 野球盤
 
 // 盤表示
 
-.point-box {
-    display: flex;
-    justify-content: space-between;
-
-    .point-item {
-        width: 150px;
-        // 従来の台形と同じ、上辺を左右20pxずつ内側に寄せる。
-        clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 100%, 0 100%);
-    }
-}
-
-// 移動用（中央揃え）
-.moved-item-center {
-    position: absolute;
-    // 中央揃えの指定
-    left: 0;
-    right: 0;
-    margin: auto;
-}
-
-// utility
-
-.item-center {
-    text-align: center;
-}
-
-// 文字数が多い時の「...」表記
-.text-shortten {
-    overflow: hidden;
-    white-space: pre;
-    text-overflow: ellipsis;
-}
-
-.pointer {
-    cursor: pointer;
+.point-item {
+  width: 150px;
+  // 従来の台形と同じ、上辺を左右20pxずつ内側に寄せる。
+  clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 100%, 0 100%);
 }

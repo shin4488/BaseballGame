@@ -99,18 +99,30 @@ test("配信する全画像とfaviconは元ファイルのバイナリを保持�
       `image/${file} must match the source bytes`
     );
   }
+  const favicon = fs.readFileSync("publish/image/favicon.png");
   assert.ok(
-    fs.readFileSync("publish/favicon.ico")
-      .equals(fs.readFileSync("src/image/favicon.ico")),
-    "favicon.ico must match the source bytes"
+    favicon
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    "favicon must be a PNG image"
   );
+  const html = fs.readFileSync("publish/index.html", "utf8");
+  const iconLink = html.match(/<link\b[^>]*\brel=["']?icon["']?[^>]*>/)?.[0];
+  assert.ok(iconLink, "favicon link must exist");
+  assert.match(iconLink, /\btype=["']?image\/png(?:["'\s>])/);
+  assert.match(iconLink, /\bhref=["']?\.\/image\/favicon\.png(?:["'\s>])/);
 });
 
 test("配信HTMLはJS・CSSの内容に一致するキャッシュ識別子を参照する", () => {
   const { createHash } = require("node:crypto");
   const html = fs.readFileSync("publish/index.html", "utf8");
-  for (const [attribute, file] of [["src", "main.js"], ["href", "./style/index.css"]]) {
-    const hash = createHash("sha256").update(fs.readFileSync(`publish/${file}`)).digest("hex");
+  for (const [attribute, file] of [
+    ["src", "main.js"],
+    ["href", "./style/index.css"],
+  ]) {
+    const hash = createHash("sha256")
+      .update(fs.readFileSync(`publish/${file}`))
+      .digest("hex");
     assert.ok(html.includes(`${attribute}="${file}?v=${hash}"`), file);
   }
   assert.equal(html.includes("ver=1.0.1"), false);

@@ -76,7 +76,8 @@ export const createVueInstance = () => {
         return this.strikeCount === 2;
       },
       playerNameComputed() {
-        if (this.loginUserName !== null) return this.loginUserName || 'プレイヤー';
+        if (this.loginUserName !== null)
+          return this.loginUserName || 'プレイヤー';
         if (this.guestNumber !== null) return `ゲスト${this.guestNumber}`;
         return this.isPreparingGuest ? '番号を取得中…' : 'ゲスト';
       },
