@@ -34,11 +34,7 @@ export const createVueInstance = () => {
         return `top: ${this.hitButtonYPositionComputed}px;`;
       },
       boardItemStyleComputed() {
-        return `height: ${this.ballSize}px;
-          line-height: ${this.ballSize}px;`;
-      },
-      playingResultStyleComputed() {
-        return `top: ${this.viewportHeight / 2}px;`;
+        return `height: ${this.ballSize}px;`;
       },
       /** マウンドの初期Y座標 */
       moundYPositionComputed() {
