@@ -17,7 +17,7 @@ function fixture({ loggedIn = false, save } = {}) {
     getLoginUserIconImage: () => 'player.png',
   };
   const { code } = babel.transformFileSync('src/application/vue/index.js', {
-    presets: ['@babel/preset-env'], babelrc: false, configFile: false,
+    presets: [['@babel/preset-env', { modules: 'commonjs' }]], babelrc: false, configFile: false,
   });
   const exports = {};
   vm.runInNewContext(code, {

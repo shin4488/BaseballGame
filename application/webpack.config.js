@@ -33,7 +33,7 @@ module.exports = (env, argv) => {
             loader: 'babel-loader',
             options: {
               presets: [
-                // プリセットを指定することで、ES2020をES5に変換
+                // 変換対象のブラウザはBabelの既定（browserslistのdefaults）に従う
                 '@babel/preset-env',
                 {
                   compact: false,

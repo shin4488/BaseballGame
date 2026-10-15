@@ -54,7 +54,7 @@ export class FireStore {
         .map((x) => x.data())
         .filter((x) => x[FireStoreColumn.point] >= 0);
     } catch (error) {
-      throw new Error('Ranking Fetch Error1');
+      throw new Error('Ranking Fetch Error1', { cause: error });
     }
   }
 
@@ -71,7 +71,7 @@ export class FireStore {
 
       return guests.docs.map((x) => x.data());
     } catch (error) {
-      throw new Error('Ranking Fetch Error2');
+      throw new Error('Ranking Fetch Error2', { cause: error });
     }
   }
 
@@ -125,7 +125,7 @@ export class FireStore {
       const guestNumberWithPadding = String(guestNumber).padStart(10, '0');
       return { guestNumberWithPadding, randomString };
     } catch (error) {
-      throw new Error('Create Id Error');
+      throw new Error('Create Id Error', { cause: error });
     }
   }
 

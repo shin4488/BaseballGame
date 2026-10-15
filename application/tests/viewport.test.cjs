@@ -13,7 +13,7 @@ function fixture(width, height) {
     },
   };
   const { code } = babel.transformFileSync('src/application/vue/index.js', {
-    presets: ['@babel/preset-env'], babelrc: false, configFile: false,
+    presets: [['@babel/preset-env', { modules: 'commonjs' }]], babelrc: false, configFile: false,
   });
   const exports = {};
   vm.runInNewContext(code, { exports, window, Math, setTimeout: () => {},

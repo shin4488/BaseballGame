@@ -33,11 +33,7 @@ const sassTask = () =>
 
 // eslint適用
 const lint = async () => {
-  const eslint = new ESLint({
-    overrideConfig: {
-      ignorePatterns: ['node_modules/**', 'dist/**', 'publish/**'],
-    },
-  });
+  const eslint = new ESLint();
   const results = await eslint.lintFiles(['**/*.js']);
   const formatter = await eslint.loadFormatter('stylish');
   const output = formatter.format(results);

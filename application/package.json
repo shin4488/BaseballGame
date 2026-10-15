@@ -13,31 +13,32 @@
     "test:browser:build": "node tests/browser/build.cjs"
   },
   "devDependencies": {
-    "@babel/core": "^7.14.5",
-    "@babel/preset-env": "^7.14.5",
-    "babel-eslint": "^10.1.0",
-    "babel-loader": "^8.2.2",
+    "@babel/core": "^8.0.7",
+    "@babel/preset-env": "^8.0.7",
+    "@eslint/js": "^10.0.1",
+    "babel-loader": "^10.1.1",
     "babel-plugin-transform-runtime": "^6.23.0",
     "copy-webpack-plugin": "14.0.0",
     "core-js": "3",
-    "eslint": "^7.27.0",
+    "eslint": "^10.12.0",
     "eslint-cli": "^1.1.1",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "globals": "^17.13.0",
     "gulp": "5.0.1",
     "gulp-mode": "^1.1.0",
     "gulp-sass": "6.0.1",
-    "prettier": "^2.3.0",
-    "regenerator-runtime": "^0.13.7",
-    "webpack": "^5.37.1",
-    "webpack-cli": "^4.7.0",
-    "webpack-stream": "7.0.0",
-    "sass": "1.104.0",
-    "webpack-dev-server": "6.0.0"
+    "prettier": "^3.9.9",
+    "regenerator-runtime": "^0.14.1",
+    "sass": "1.105.1",
+    "webpack": "^5.111.1",
+    "webpack-cli": "^7.2.3",
+    "webpack-dev-server": "6.0.0",
+    "webpack-stream": "7.0.0"
   },
   "dependencies": {
-    "dotenv-webpack": "^7.0.3",
-    "firebase": "12.18.0"
+    "dotenv-webpack": "^9.0.0",
+    "firebase": "13.0.0"
   },
   "engines": {
     "node": "24.x"
