@@ -10,7 +10,7 @@ function load(
 ) {
   const exports = {};
   const code = babel.transformFileSync(file, {
-    presets: ['@babel/preset-env'],
+    presets: [['@babel/preset-env', { modules: 'commonjs' }]],
     babelrc: false,
     configFile: false,
   }).code;

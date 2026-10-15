@@ -15,7 +15,7 @@
   "devDependencies": {
     "@babel/core": "^8.0.7",
     "@babel/preset-env": "^8.0.7",
-    "babel-eslint": "^10.1.0",
+    "@eslint/js": "^10.0.1",
     "babel-loader": "^10.1.1",
     "babel-plugin-transform-runtime": "^6.23.0",
     "copy-webpack-plugin": "14.0.0",
@@ -24,16 +24,17 @@
     "eslint-cli": "^1.1.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
+    "globals": "^17.13.0",
     "gulp": "5.0.1",
     "gulp-mode": "^1.1.0",
     "gulp-sass": "6.0.1",
     "prettier": "^3.9.9",
     "regenerator-runtime": "^0.14.1",
+    "sass": "1.105.1",
     "webpack": "^5.111.1",
     "webpack-cli": "^7.2.3",
-    "webpack-stream": "7.0.0",
-    "sass": "1.105.1",
-    "webpack-dev-server": "6.0.0"
+    "webpack-dev-server": "6.0.0",
+    "webpack-stream": "7.0.0"
   },
   "dependencies": {
     "dotenv-webpack": "^9.0.0",

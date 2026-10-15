@@ -117,10 +117,10 @@ export const getResultMessage = (totalPoint) => {
   return totalPoint === 0
     ? `あきらめないで！${pointMessage}`
     : totalPoint < 10
-    ? `調子が出てきた！${pointMessage}`
-    : totalPoint < 20
-    ? `やったね！${pointMessage}`
-    : totalPoint < 50
-    ? `うまい！${pointMessage}`
-    : `プロ野球選手も夢じゃない！${pointMessage}`;
+      ? `調子が出てきた！${pointMessage}`
+      : totalPoint < 20
+        ? `やったね！${pointMessage}`
+        : totalPoint < 50
+          ? `うまい！${pointMessage}`
+          : `プロ野球選手も夢じゃない！${pointMessage}`;
 };

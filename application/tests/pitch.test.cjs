@@ -8,7 +8,7 @@ function load(file, dependencies = {}, globals = {}) {
     cache.set(
       file,
       babel.transformFileSync(file, {
-        presets: ["@babel/preset-env"],
+        presets: [["@babel/preset-env", { modules: "commonjs" }]],
         babelrc: false,
         configFile: false,
       }).code
