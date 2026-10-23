@@ -28,9 +28,11 @@ function load(
   return exports;
 }
 function database(browserCrypto, initialCounter = 700) {
-  let counterData = initialCounter === null ? null : {lastNumber: initialCounter};
+  let counterData =
+    initialCounter === null ? null : { lastNumber: initialCounter };
   let revision = 0;
-  const counterWrites = [], transactionReads = [];
+  const counterWrites = [],
+    transactionReads = [];
   const reads = [],
     writes = [],
     deletes = [],
@@ -60,9 +62,11 @@ function database(browserCrypto, initialCounter = 700) {
         const result = await callback({
           get: async (ref) => {
             transactionReads.push(ref);
-            return {exists: () => readData !== null, data: () => readData};
+            return { exists: () => readData !== null, data: () => readData };
           },
-          set: (ref, data) => { pending = {ref, data}; },
+          set: (ref, data) => {
+            pending = { ref, data };
+          },
         });
         if (readRevision !== revision) continue;
         if (pending) {
@@ -78,7 +82,7 @@ function database(browserCrypto, initialCounter = 700) {
       counts.push(query);
       const next = snapshots.shift();
       if (next instanceof Error) throw next;
-      return { data: () => ({count: next.size}) };
+      return { data: () => ({ count: next.size }) };
     },
     getDocs: async (query) => {
       reads.push(query);
@@ -120,7 +124,7 @@ function database(browserCrypto, initialCounter = 700) {
   };
 }
 test('ゲスト番号は701、702と連番になり、件数集計や全件取得をしない', async () => {
-  const d = database({getRandomValues: bytes => bytes.fill(171)});
+  const d = database({ getRandomValues: (bytes) => bytes.fill(171) });
   const first = await d.store.createUserId();
   const second = await d.store.createUserId();
   assert.equal(first.guestNumberWithPadding, '0000000701');
@@ -134,51 +138,92 @@ test('ゲスト番号は701、702と連番になり、件数集計や全件取�
 
 test('初回は過去の20文字IDの最大番号を1件だけ取得して引き継ぐ', async () => {
   const d = database(undefined, null);
-  d.snapshots.push(d.snapshot([{userId: '0000000700abcdefghij'}]));
-  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000000701');
+  d.snapshots.push(d.snapshot([{ userId: '0000000700abcdefghij' }]));
+  assert.equal(
+    (await d.store.createUserId()).guestNumberWithPadding,
+    '0000000701',
+  );
   await d.store.createUserId();
   assert.equal(d.reads.length, 1);
-  assert.deepEqual(d.reads[0].constraints, [{kind:'order',field:'userId',direction:'desc'},{kind:'limit',value:1}]);
+  assert.deepEqual(d.reads[0].constraints, [
+    { kind: 'order', field: 'userId', direction: 'desc' },
+    { kind: 'limit', value: 1 },
+  ]);
 });
 test('データがない場合は1から開始する', async () => {
-  const d = database(undefined, null);d.snapshots.push(d.snapshot([]));
-  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000000001');
+  const d = database(undefined, null);
+  d.snapshots.push(d.snapshot([]));
+  assert.equal(
+    (await d.store.createUserId()).guestNumberWithPadding,
+    '0000000001',
+  );
 });
 test('保存済みのランダム番号があれば、その最大番号も再利用しない', async () => {
-  const d = database(undefined, null);d.snapshots.push(d.snapshot([{userId:'0000932456'+'ab'.repeat(16)}]));
-  assert.equal((await d.store.createUserId()).guestNumberWithPadding, '0000932457');
+  const d = database(undefined, null);
+  d.snapshots.push(d.snapshot([{ userId: '0000932456' + 'ab'.repeat(16) }]));
+  assert.equal(
+    (await d.store.createUserId()).guestNumberWithPadding,
+    '0000932457',
+  );
 });
 test('同時に20人が開始しても競合を再試行し、番号が重複しない', async () => {
   const d = database();
-  const ids = await Promise.all(Array.from({length:20},()=>d.store.createUserId()));
-  assert.deepEqual(ids.map(id=>Number(id.guestNumberWithPadding)).sort((a,b)=>a-b),Array.from({length:20},(_,i)=>701+i));
-  assert.equal(d.counterWrites.length,20);
-  assert.ok(d.transactionReads.length > 20,'競合による再試行を通る');
+  const ids = await Promise.all(
+    Array.from({ length: 20 }, () => d.store.createUserId()),
+  );
+  assert.deepEqual(
+    ids.map((id) => Number(id.guestNumberWithPadding)).sort((a, b) => a - b),
+    Array.from({ length: 20 }, (_, i) => 701 + i),
+  );
+  assert.equal(d.counterWrites.length, 20);
+  assert.ok(d.transactionReads.length > 20, '競合による再試行を通る');
 });
 test('初回の同時開始でもカウンターを上書きせず連番を発行する', async () => {
-  const d = database(undefined,null);
-  d.snapshots.push(d.snapshot([{userId:'0000000700abcdefghij'}]),d.snapshot([{userId:'0000000700abcdefghij'}]));
-  const ids=await Promise.all([d.store.createUserId(),d.store.createUserId()]);
-  assert.deepEqual(ids.map(id=>Number(id.guestNumberWithPadding)).sort(),[701,702]);
+  const d = database(undefined, null);
+  d.snapshots.push(
+    d.snapshot([{ userId: '0000000700abcdefghij' }]),
+    d.snapshot([{ userId: '0000000700abcdefghij' }]),
+  );
+  const ids = await Promise.all([
+    d.store.createUserId(),
+    d.store.createUserId(),
+  ]);
+  assert.deepEqual(
+    ids.map((id) => Number(id.guestNumberWithPadding)).sort(),
+    [701, 702],
+  );
 });
-for(const value of [-1,1.5,'700',NaN,9999999999])test(`不正または上限のカウンター${value}は更新しない`,async()=>{
-  const d=database(undefined,value);
-  await assert.rejects(d.store.createUserId(),{message:'Create Id Error'});
-  assert.equal(d.counterWrites.length,0);
+for (const value of [-1, 1.5, '700', NaN, 9999999999])
+  test(`不正または上限のカウンター${value}は更新しない`, async () => {
+    const d = database(undefined, value);
+    await assert.rejects(d.store.createUserId(), {
+      message: 'Create Id Error',
+    });
+    assert.equal(d.counterWrites.length, 0);
+  });
+test('10桁の最終番号でもIDは42文字を維持する', async () => {
+  const d = database(undefined, 9999999998);
+  const id = await d.store.createUserId();
+  assert.match(
+    id.guestNumberWithPadding + id.randomString,
+    /^9999999999[0-9a-f]{32}$/,
+  );
 });
-test('10桁の最終番号でもIDは42文字を維持する',async()=>{
-  const d=database(undefined,9999999998);
-  const id=await d.store.createUserId();
-  assert.match(id.guestNumberWithPadding+id.randomString,/^9999999999[0-9a-f]{32}$/);
+test('安全な乱数が使えない場合はカウンターも進めない', async () => {
+  const d = database({
+    getRandomValues: () => {
+      throw new Error('unavailable');
+    },
+  });
+  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
+  assert.equal(d.transactionReads.length, 0);
+  assert.equal(d.counterWrites.length, 0);
 });
-test('安全な乱数が使えない場合はカウンターも進めない',async()=>{
-  const d=database({getRandomValues:()=>{throw new Error('unavailable');}});
-  await assert.rejects(d.store.createUserId(),{message:'Create Id Error'});
-  assert.equal(d.transactionReads.length,0);assert.equal(d.counterWrites.length,0);
-});
-test('初回の既存IDが不正な場合は1からやり直さず失敗する',async()=>{
-  const d=database(undefined,null);d.snapshots.push(d.snapshot([{userId:'broken'}]));
-  await assert.rejects(d.store.createUserId());assert.equal(d.counterWrites.length,0);
+test('初回の既存IDが不正な場合は1からやり直さず失敗する', async () => {
+  const d = database(undefined, null);
+  d.snapshots.push(d.snapshot([{ userId: 'broken' }]));
+  await assert.rejects(d.store.createUserId());
+  assert.equal(d.counterWrites.length, 0);
 });
 
 function guestScreen(store) {
@@ -196,7 +241,9 @@ function guestScreen(store) {
     },
     undefined,
     {
-      window: { document: { documentElement: { clientWidth: 1280, clientHeight: 720 } } },
+      window: {
+        document: { documentElement: { clientWidth: 1280, clientHeight: 720 } },
+      },
       Vue: function (options) {
         return options;
       },
@@ -226,7 +273,12 @@ test('画面は連番発行後に42文字のゲストIDを保持してゲーム�
 
 test('ID生成失敗は画面で通知し、再試行できる', async () => {
   let fail = true;
-  const d = database({getRandomValues: bytes => {if (fail) throw new Error('unavailable'); return bytes.fill(0);}});
+  const d = database({
+    getRandomValues: (bytes) => {
+      if (fail) throw new Error('unavailable');
+      return bytes.fill(0);
+    },
+  });
   const screen = guestScreen(d.store);
   await screen.onClickGuestStart();
   assert.equal(screen.hasStarted(), false);
@@ -381,13 +433,31 @@ for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
   test(`${method}は両コレクションを同時取得し、得点・日時順の上位10件を返す`, async () => {
     const d = database();
     let finishGuests, finishUsers;
-    d.FireStoreExtention.guestStore = { [method]: () => new Promise(r => { finishGuests = r; }) };
-    d.FireStoreExtention.loginUserStore = { [method]: () => new Promise(r => { finishUsers = r; }) };
+    d.FireStoreExtention.guestStore = {
+      [method]: () =>
+        new Promise((r) => {
+          finishGuests = r;
+        }),
+    };
+    d.FireStoreExtention.loginUserStore = {
+      [method]: () =>
+        new Promise((r) => {
+          finishUsers = r;
+        }),
+    };
     const pending = d.FireStoreExtention[method]();
     assert.equal(typeof finishGuests, 'function');
     assert.equal(typeof finishUsers, 'function');
-    finishGuests(Array.from({length: 10}, (_,i) => ({point: i, lastUpdated: new Date(1000)})));
-    finishUsers([{point: 9, lastUpdated: new Date(0)}, {point: 20, lastUpdated: new Date(0)}]);
+    finishGuests(
+      Array.from({ length: 10 }, (_, i) => ({
+        point: i,
+        lastUpdated: new Date(1000),
+      })),
+    );
+    finishUsers([
+      { point: 9, lastUpdated: new Date(0) },
+      { point: 20, lastUpdated: new Date(0) },
+    ]);
     const result = await pending;
     assert.equal(result.length, 10);
     assert.equal(result[0].point, 20);
@@ -398,38 +468,72 @@ for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
 }
 
 function rankingScreen(sources, loginUserName = null) {
-  const { createVueInstance } = load('src/application/vue/index.js', {
-    '../vector/vector2': {},
-    '../firebase/auth': { FirebaseAuthExtention: {auth: {getLoginUserName: () => loginUserName}} },
-    '../firebase/database': { FireStoreExtention: sources },
-    './process': {}, './appConfig': {boardItems: []}, 'regenerator-runtime/runtime.js': {},
-  }, undefined, {
-    window: {document: {documentElement: {clientWidth: 390, clientHeight: 844}}, addEventListener: () => {}},
-    Vue: function(options) { return options; },
-  });
+  const { createVueInstance } = load(
+    'src/application/vue/index.js',
+    {
+      '../vector/vector2': {},
+      '../firebase/auth': {
+        FirebaseAuthExtention: {
+          auth: { getLoginUserName: () => loginUserName },
+        },
+      },
+      '../firebase/database': { FireStoreExtention: sources },
+      './process': {},
+      './appConfig': { boardItems: [] },
+      'regenerator-runtime/runtime.js': {},
+    },
+    undefined,
+    {
+      window: {
+        document: { documentElement: { clientWidth: 390, clientHeight: 844 } },
+        addEventListener: () => {},
+      },
+      Vue: function (options) {
+        return options;
+      },
+    },
+  );
   const options = createVueInstance();
-  const app = {...options.data, ...options.methods, mapFirestoreToRankingTable: async rows => rows};
-  return {app, options};
+  const app = {
+    ...options.data,
+    ...options.methods,
+    mapFirestoreToRankingTable: async (rows) => rows,
+  };
+  return { app, options };
 }
-const flush = () => new Promise(resolve => setImmediate(resolve));
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 test('番号と週間ランキングが取得中でも歴代を表示し、番号が届けば開始画面に保持する', async () => {
   let finishHistory, finishWeek, finishGuest;
-  const {app, options} = rankingScreen({
-    getRankingHistory: () => new Promise(r => {finishHistory = r;}),
-    getRankingThisWeek: () => new Promise(r => {finishWeek = r;}),
-    guestStore: {createUserId: () => new Promise(r => {finishGuest = r;})},
+  const { app, options } = rankingScreen({
+    getRankingHistory: () =>
+      new Promise((r) => {
+        finishHistory = r;
+      }),
+    getRankingThisWeek: () =>
+      new Promise((r) => {
+        finishWeek = r;
+      }),
+    guestStore: {
+      createUserId: () =>
+        new Promise((r) => {
+          finishGuest = r;
+        }),
+    },
   });
   options.mounted.call(app);
   assert.equal(app.shouldShowInitImage, false);
   assert.equal(app.guestUserId, null);
   assert.equal(app.isPreparingGuest, true);
-  finishGuest({guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)});
+  finishGuest({
+    guestNumberWithPadding: '0000000701',
+    randomString: 'ab'.repeat(16),
+  });
   await flush();
   assert.equal(app.guestNumber, 701);
   assert.equal(app.isPreparingGuest, false);
   assert.equal(typeof finishWeek, 'function');
-  finishHistory([{point: 21}]);
+  finishHistory([{ point: 21 }]);
   await flush();
   assert.equal(app.rankings.history.dataList[0].point, 21);
   assert.equal(app.rankings.history.isLoading, false);
@@ -441,9 +545,12 @@ test('番号と週間ランキングが取得中でも歴代を表示し、番�
 
 test('片方の取得失敗でも他方を表示し、再取得できる', async () => {
   let fail = true;
-  const {app} = rankingScreen({
-    getRankingHistory: async () => [{point: 12}],
-    getRankingThisWeek: async () => {if (fail) throw new Error('offline'); return [{point: 7}];},
+  const { app } = rankingScreen({
+    getRankingHistory: async () => [{ point: 12 }],
+    getRankingThisWeek: async () => {
+      if (fail) throw new Error('offline');
+      return [{ point: 7 }];
+    },
   });
   await app.initializeTopMenuData();
   assert.equal(app.rankings.history.dataList[0].point, 12);
@@ -457,59 +564,93 @@ test('片方の取得失敗でも他方を表示し、再取得できる', async
 
 test('古い応答で新しいランキングを上書きしない', async () => {
   const pending = [];
-  const {app} = rankingScreen({getRankingHistory: () => new Promise(r => pending.push(r)), getRankingThisWeek: async () => []});
+  const { app } = rankingScreen({
+    getRankingHistory: () => new Promise((r) => pending.push(r)),
+    getRankingThisWeek: async () => [],
+  });
   const old = app.initializeTopMenuData();
   const current = app.initializeTopMenuData();
-  pending[1]([{point: 20}]);
+  pending[1]([{ point: 20 }]);
   await current;
-  pending[0]([{point: 1}]);
+  pending[0]([{ point: 1 }]);
   await old;
   assert.equal(app.rankings.history.dataList[0].point, 20);
 });
 
 test('ゲスト開始を連打してもID発行は1回、発行後に開始する', async () => {
-  let count = 0, finish;
-  const screen = guestScreen({createUserId: () => {count++; return new Promise(r => {finish = r;});}});
+  let count = 0,
+    finish;
+  const screen = guestScreen({
+    createUserId: () => {
+      count++;
+      return new Promise((r) => {
+        finish = r;
+      });
+    },
+  });
   const first = screen.onClickGuestStart();
   await flush();
   await screen.onClickGuestStart();
   assert.equal(count, 1);
   assert.equal(screen.hasStarted(), false);
-  finish({guestNumberWithPadding: '0000000007', randomString: 'ab'.repeat(16)});
+  finish({
+    guestNumberWithPadding: '0000000007',
+    randomString: 'ab'.repeat(16),
+  });
   await first;
   assert.equal(screen.hasStarted(), true);
   assert.equal(screen.guestNumber, 7);
   assert.equal(screen.isStartingGame, false);
 });
 
-test('発番通信に失敗した場合はランダム番号で開始せず、再試行できる',async()=>{
-  const d=database();const transaction=d.sdk.runTransaction;
-  d.sdk.runTransaction=async()=>{throw new Error('resource-exhausted');};
-  const screen=guestScreen(d.store);await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(),false);assert.equal(screen.guestUserId,null);
-  assert.match(screen.startError,/開始できませんでした/);assert.equal(d.counterWrites.length,0);
-  d.sdk.runTransaction=transaction;await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(),true);assert.equal(screen.guestNumber,701);assert.equal(screen.startError,'');
+test('発番通信に失敗した場合はランダム番号で開始せず、再試行できる', async () => {
+  const d = database();
+  const transaction = d.sdk.runTransaction;
+  d.sdk.runTransaction = async () => {
+    throw new Error('resource-exhausted');
+  };
+  const screen = guestScreen(d.store);
+  await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(), false);
+  assert.equal(screen.guestUserId, null);
+  assert.match(screen.startError, /開始できませんでした/);
+  assert.equal(d.counterWrites.length, 0);
+  d.sdk.runTransaction = transaction;
+  await screen.onClickGuestStart();
+  assert.equal(screen.hasStarted(), true);
+  assert.equal(screen.guestNumber, 701);
+  assert.equal(screen.startError, '');
 });
-test('同じゲストで再度開始する場合は番号を再発行しない',async()=>{
-  const d=database();const screen=guestScreen(d.store);
-  await screen.onClickGuestStart();const first=screen.guestUserId;
-  await screen.onClickGuestStart();assert.equal(screen.guestUserId,first);assert.equal(d.counterWrites.length,1);
+test('同じゲストで再度開始する場合は番号を再発行しない', async () => {
+  const d = database();
+  const screen = guestScreen(d.store);
+  await screen.onClickGuestStart();
+  const first = screen.guestUserId;
+  await screen.onClickGuestStart();
+  assert.equal(screen.guestUserId, first);
+  assert.equal(d.counterWrites.length, 1);
 });
-
 
 test('開始画面の発番中に開始を押しても番号を二重発行しない', async () => {
-  let calls = 0, finish;
-  const screen = guestScreen({createUserId: () => {
-    calls++;
-    return new Promise(resolve => {finish = resolve;});
-  }});
+  let calls = 0,
+    finish;
+  const screen = guestScreen({
+    createUserId: () => {
+      calls++;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
   const preparation = screen.createGuestUser();
   const start = screen.onClickGuestStart();
   await flush();
   assert.equal(calls, 1);
   assert.equal(screen.hasStarted(), false);
-  finish({guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)});
+  finish({
+    guestNumberWithPadding: '0000000701',
+    randomString: 'ab'.repeat(16),
+  });
   await Promise.all([preparation, start]);
   assert.equal(screen.guestNumber, 701);
   assert.equal(screen.hasStarted(), true);
@@ -519,12 +660,18 @@ test('開始画面の発番中に開始を押しても番号を二重発行し�
 
 test('初回発番の失敗は画面に表示し、取得処理をやり直せる', async () => {
   let fail = true;
-  const {app, options} = rankingScreen({
-    getRankingHistory: async () => [], getRankingThisWeek: async () => [],
-    guestStore: {createUserId: async () => {
-      if (fail) throw new Error('offline');
-      return {guestNumberWithPadding: '0000000701', randomString: 'ab'.repeat(16)};
-    }},
+  const { app, options } = rankingScreen({
+    getRankingHistory: async () => [],
+    getRankingThisWeek: async () => [],
+    guestStore: {
+      createUserId: async () => {
+        if (fail) throw new Error('offline');
+        return {
+          guestNumberWithPadding: '0000000701',
+          randomString: 'ab'.repeat(16),
+        };
+      },
+    },
   });
   options.mounted.call(app);
   await flush();
@@ -538,10 +685,18 @@ test('初回発番の失敗は画面に表示し、取得処理をやり直せ�
 
 test('ログイン済みの開始画面ではゲスト番号を発行しない', async () => {
   let calls = 0;
-  const {app, options} = rankingScreen({
-    getRankingHistory: async () => [], getRankingThisWeek: async () => [],
-    guestStore: {createUserId: async () => {calls++;}},
-  }, '山田');
+  const { app, options } = rankingScreen(
+    {
+      getRankingHistory: async () => [],
+      getRankingThisWeek: async () => [],
+      guestStore: {
+        createUserId: async () => {
+          calls++;
+        },
+      },
+    },
+    '山田',
+  );
   options.mounted.call(app);
   await flush();
   assert.equal(app.loginUserName, '山田');

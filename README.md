@@ -76,6 +76,10 @@ yarn gulp:build
 
 # 単体テストの実行
 yarn test
+
+# lint・整形の確認
+yarn lint
+yarn format:check
 ```
 
 ---

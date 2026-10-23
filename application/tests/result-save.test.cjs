@@ -6,10 +6,12 @@ const babel = require('@babel/core');
 function fixture({ loggedIn = false, save } = {}) {
   const calls = [];
   const alerts = [];
-  const store = (kind) => ({ upsertRanking: (data) => {
-    calls.push({ kind, ...data });
-    return save();
-  }});
+  const store = (kind) => ({
+    upsertRanking: (data) => {
+      calls.push({ kind, ...data });
+      return save();
+    },
+  });
   const auth = {
     isLoggedIn: () => loggedIn,
     getLoginUserId: () => 'player-id',
@@ -17,30 +19,45 @@ function fixture({ loggedIn = false, save } = {}) {
     getLoginUserIconImage: () => 'player.png',
   };
   const { code } = babel.transformFileSync('src/application/vue/index.js', {
-    presets: [['@babel/preset-env', { modules: 'commonjs' }]], babelrc: false, configFile: false,
+    presets: [['@babel/preset-env', { modules: 'commonjs' }]],
+    babelrc: false,
+    configFile: false,
   });
   const exports = {};
   vm.runInNewContext(code, {
     exports,
-    Vue: function (options) { return options; },
+    Vue: function (options) {
+      return options;
+    },
     window: {
       document: { documentElement: { clientWidth: 1280, clientHeight: 720 } },
       alert: (message) => alerts.push(message),
     },
     require: (name) => {
-      if (name === '../firebase/auth') return { FirebaseAuthExtention: { auth } };
-      if (name === '../firebase/database') return { FireStoreExtention: {
-        guestStore: store('guest'), loginUserStore: store('login'),
-      } };
+      if (name === '../firebase/auth')
+        return { FirebaseAuthExtention: { auth } };
+      if (name === '../firebase/database')
+        return {
+          FireStoreExtention: {
+            guestStore: store('guest'),
+            loginUserStore: store('login'),
+          },
+        };
       if (name === './appConfig') return { guestImagePath: 'guest.png' };
       return {};
     },
   });
   const options = exports.createVueInstance();
   let refreshes = 0;
-  const app = { ...options.data, point: 12, guestUserId: 'guest-id', guestNumber: 624,
+  const app = {
+    ...options.data,
+    point: 12,
+    guestUserId: 'guest-id',
+    guestNumber: 624,
     shouldShowResult: true,
-    initializeTopMenuData: async () => { refreshes++; },
+    initializeTopMenuData: async () => {
+      refreshes++;
+    },
   };
   for (const [name, method] of Object.entries(options.methods)) {
     if (name !== 'initializeTopMenuData') app[name] = method.bind(app);
@@ -51,7 +68,13 @@ function fixture({ loggedIn = false, save } = {}) {
 for (const loggedIn of [false, true]) {
   test(`${loggedIn ? 'ログイン' : 'ゲスト'}の保存完了まで結果を維持し、連打と画面遷移を防ぐ`, async () => {
     let resolve;
-    const f = fixture({ loggedIn, save: () => new Promise((r) => { resolve = r; }) });
+    const f = fixture({
+      loggedIn,
+      save: () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    });
     const pending = f.app.onClickSaveButton();
     assert.equal(f.app.shouldShowResult, true);
     assert.equal(f.refreshes(), 0);
@@ -72,7 +95,11 @@ for (const loggedIn of [false, true]) {
 }
 test('保存失敗は結果と得点を残し、再試行できる', async () => {
   let fail = true;
-  const f = fixture({ save: async () => { if (fail) throw new Error('offline'); } });
+  const f = fixture({
+    save: async () => {
+      if (fail) throw new Error('offline');
+    },
+  });
   await f.app.onClickSaveButton();
   assert.equal(f.app.shouldShowResult, true);
   assert.equal(f.app.point, 12);
