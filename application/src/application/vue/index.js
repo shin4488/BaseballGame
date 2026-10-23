@@ -108,7 +108,6 @@ export const createVueInstance = () => {
       rankings: {
         thisWeek: {
           titleText: '今週の得点ランキング',
-          themeColor: 'primary',
           headerTexts: {},
           dataList: [],
           isLoading: true,
@@ -116,7 +115,6 @@ export const createVueInstance = () => {
         },
         history: {
           titleText: '歴代の得点ランキング',
-          themeColor: 'success',
           headerTexts: {},
           dataList: [],
           isLoading: true,
@@ -129,8 +127,6 @@ export const createVueInstance = () => {
         pointText: '得点',
         playDateText: 'プレイ日',
       },
-      rankingThisWeekText: '今週の得点ランキング',
-      rankingAllPeriodText: '歴代の得点ランキング',
       resultShowingButtonTexts: {
         saveResultText: '結果を上書き保存',
         retryText: '保存せずにリトライ',
