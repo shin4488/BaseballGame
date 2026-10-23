@@ -4,9 +4,6 @@ import { FirebaseAuthExtention } from './auth';
 import { FireStoreExtention } from './database';
 
 export class FirebaseInit {
-  /**
-   * 初期化処理
-   */
   static async init() {
     const firebaseConfig = {
       apiKey: process.env.FIREBASE_API_KEY,

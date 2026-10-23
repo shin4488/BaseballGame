@@ -57,14 +57,13 @@ export const createVueInstance = () => {
       hitButtonYPositionComputed() {
         return this.batYPositionComputed + this.batInitHeight;
       },
-      /** ボール半径 */
       ballRadiusComputed() {
         return this.ballSize / 2;
       },
       isBlankMessage() {
         return this.message === '';
       },
-      /** 表示幅に収まる盤の数 */
+      /** 表示幅に収まる的の数。150は的（.point-item）の幅 */
       boardItemCounterComputed() {
         return Math.max(2, Math.min(4, Math.floor(this.viewportWidth / 150)));
       },
@@ -77,7 +76,6 @@ export const createVueInstance = () => {
         if (this.guestNumber !== null) return `ゲスト${this.guestNumber}`;
         return this.isPreparingGuest ? '番号を取得中…' : 'ゲスト';
       },
-      /** ユーザ名表示メッセージ */
       userMessageComputed() {
         return `こんにちは ${this.playerNameComputed} さん`;
       },
@@ -85,7 +83,6 @@ export const createVueInstance = () => {
       resultHeadlineComputed() {
         return this.resultMessage.replace(/ \d+ 得点$/, '');
       },
-      /** ログインユーザでスタートボタンの表示テキスト */
       userStartButtonTextComputed() {
         return this.loginUserName === null
           ? 'ログインして開始'
@@ -213,9 +210,6 @@ export const createVueInstance = () => {
           );
         }
       },
-      /**
-       * ゲストでスタートボタン押下処理
-       */
       async onClickGuestStart() {
         if (this.isStartingGame) return;
         this.isStartingGame = true;
@@ -234,12 +228,8 @@ export const createVueInstance = () => {
           this.isStartingGame = false;
         }
       },
-      /**
-       * ログインしてスタートボタン押下処理
-       */
       async onClickLogin() {
         if (this.isStartingGame) return;
-        // 未ログイン時のみfirebaseログイン処理
         if (!FirebaseAuthExtention.auth.isLoggedIn()) {
           try {
             await FirebaseAuthExtention.auth.signInWithPopupToGoogle();
@@ -252,9 +242,6 @@ export const createVueInstance = () => {
         this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
         this.executeBaseballGame();
       },
-      /**
-       * アカウントを切り替えてスタートボタン押下処理
-       */
       async onClickChangeAccount() {
         if (this.isStartingGame) return;
         try {
@@ -267,10 +254,6 @@ export const createVueInstance = () => {
         this.loginUserName = FirebaseAuthExtention.auth.getLoginUserName();
         this.executeBaseballGame();
       },
-      /**
-       * トップ画面で削除ボタン押下処理
-       * @param {*} recordItem
-       */
       async onClickRecordDeleteButton(recordItem) {
         const shouldDelete = window.confirm(
           `記録を削除しますか。\n得点：${recordItem.point}\nプレイ日：${recordItem.playDate}`,
@@ -279,13 +262,9 @@ export const createVueInstance = () => {
           await FireStoreExtention.loginUserStore.deleteRanking(
             recordItem.playerId,
           );
-          // ランキング再検索
           this.initializeTopMenuData();
         }
       },
-      /**
-       * 打つボタン押下処理
-       */
       onClickHit() {
         // 徐々にバットを振る
         this.batRotateDegree = -this.ratRotateDegreeSpeed;
@@ -297,9 +276,6 @@ export const createVueInstance = () => {
           }
         }, this.batSwingInterval);
       },
-      /**
-       * 「保存」ボタン押下処理
-       */
       async onClickSaveButton() {
         if (this.isSavingResult) return;
         this.isSavingResult = true;
@@ -309,7 +285,6 @@ export const createVueInstance = () => {
         const loginUserIconImage =
           FirebaseAuthExtention.auth.getLoginUserIconImage();
 
-        // 保存処理
         const parameter = {
           documentId: isLoggedIn ? loginUserId : this.guestUserId,
           userName: isLoggedIn ? loginUserName : `ゲスト${this.guestNumber}`,
@@ -333,27 +308,19 @@ export const createVueInstance = () => {
         this.shouldShowResult = false;
         await this.initializeTopMenuData();
       },
-      /**
-       * 「保存せずにリトライ」ボタン押下処理
-       */
       onClickRetryButton() {
         if (this.isSavingResult) return;
         this.shouldShowResult = false;
         this.executeBaseballGame();
       },
-      /**
-       * 結果表示画面で「保存せずに閉じる」ボタン押下処理
-       */
       onClickFinishButton() {
         if (this.isSavingResult) return;
         this.shouldShowResult = false;
         this.initializeTopMenuData();
       },
 
-      /**
-       * トップメニュー画面のデータセット
-       */
       async initializeTopMenuData() {
+        // 取得を重ねて呼んだ場合に、先の呼び出しの遅い応答で新しい結果を上書きしない。
         const requestId = ++this.rankingsRequestId;
         const sources = [
           ['history', () => FireStoreExtention.getRankingHistory()],
@@ -380,11 +347,6 @@ export const createVueInstance = () => {
           }),
         );
       },
-      /**
-       * firestoreのデータを画面に表示するデータに変換
-       * @param {*} firestoreDataList
-       * @returns
-       */
       async mapFirestoreToRankingTable(firestoreDataList) {
         const loginUser = await FirebaseAuthExtention.auth.getLoginUserId();
         return firestoreDataList.map((x) => {
@@ -402,9 +364,6 @@ export const createVueInstance = () => {
           };
         });
       },
-      /**
-       * ゲストユーザの作成
-       */
       async createGuestUser() {
         if (this.guestUserId !== null) return;
         // 初回表示と開始ボタンが重なっても、同じ発番を待つ。
@@ -422,12 +381,8 @@ export const createVueInstance = () => {
         }
         await guestCreation;
       },
-      /**
-       * ゲーム開始
-       */
       executeBaseballGame() {
         if (this.isGameOpened) return;
-        // ゲーム開始前に初期化する
         this.clearBaseballGame();
 
         this.message = 'プレイボール！';
@@ -436,7 +391,6 @@ export const createVueInstance = () => {
         // 前の投球が完了するまで、次の投球を予約しない。
         const pitchNext = async () => {
           const startedAt = Date.now();
-          // 1球投げる
           await this.throwBall();
 
           this.clearThrowingBall();
@@ -465,9 +419,6 @@ export const createVueInstance = () => {
         };
         setTimeout(pitchNext, this.reThrowInterval);
       },
-      /**
-       * 盤のセット
-       */
       setBoardItems() {
         this.boardItems = [];
         for (
@@ -479,24 +430,18 @@ export const createVueInstance = () => {
           this.boardItems.push(boardItems[targetIndex]);
         }
       },
-      /**
-       * 投球クリア処理
-       */
       clearThrowingBall() {
         this.yBallPosition = 0;
         this.xBallPosition = 0;
         this.setBoardItems();
       },
-      /**
-       * ゲームのクリア処理
-       */
       clearBaseballGame() {
         this.point = 0;
         this.outCount = 0;
         this.strikeCount = 0;
       },
       /**
-       * 投球
+       * ボールを1球投げ、得点・アウト・ストライク・ファールのいずれかが決まるか、ボールの座標を取得できなかった時点で完了する。
        */
       async throwBall() {
         const boardList = window.document.getElementsByClassName('point-item');
@@ -510,21 +455,18 @@ export const createVueInstance = () => {
 
         await new window.Promise((resolve) => {
           const ballMoveProcess = setInterval(() => {
-            // ボールへの当たり判定
-            // バットの始点座標、バットの終点座標
+            // 回転したバットを囲む矩形の上辺を、バットの線分として扱う。
             const bat = window.document.getElementById('bat');
             const batPosition = bat.getBoundingClientRect();
             const batStartVec2 = new Vector2(batPosition.left, batPosition.top);
             const batEndVec2 = new Vector2(batPosition.right, batPosition.top);
-            // ボールの中心座標
             const ball = window.document.getElementById('ball');
             const ballPosition = ball.getBoundingClientRect();
             const ballCenterVec2 = new Vector2(
               ballPosition.left + this.ballRadiusComputed,
               ballPosition.top + this.ballRadiusComputed,
             );
-            // 判定処理
-            // TODO:振り遅れの時どこまでバットに当たったといえるとするか（circleRaiusがマイナス）
+            // TODO: 振り遅れをどこまで当たりとするか（maxAllowedLateHitに渡す負の値）を決める。
             const isHitToBat = isHitCircleToLine(
               batStartVec2,
               batEndVec2,
@@ -544,7 +486,7 @@ export const createVueInstance = () => {
               return;
             }
 
-            // iOS系の端末でボールの座標を検知できない時があるため、座標がセットされていなければ打ち直しとする
+            // iOS系の端末でボールの座標を検知できない時があるため、座標がセットされていなければ投げ直しとする
             // TODO:どういうわけかバットとの当たり判定前にこのチェックを行うと検知できないエラーが発生するため、バットとの当たり判定後にチェックしている
             const shouldReThrow =
               ballPosition.x === 0 &&
@@ -634,7 +576,6 @@ export const createVueInstance = () => {
 
             previousBallCenter = ballCenterVec2;
 
-            // ボール移動
             this.yBallPosition += yBallIncrement;
             // ボールが跳ね返っているときは左右にボールを振る
             if (yBallIncrement < 0) {
