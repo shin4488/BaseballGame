@@ -6,7 +6,7 @@
 
 - ビルド設定は `application/package.json`・`gulpfile.js`・`webpack.config.js`、配信は `web/` と `docker-compose.yaml`。依存・出力先・接続設定は元の定義を確認する。
 - `application/` で `yarn gulp` が開発用のビルド・監視、`yarn gulp:build` が本番用のlint・バンドル・スタイル生成。JavaScriptのバンドルだけなら `yarn webpack:build`。変更した部分に必要なビルドとブラウザ確認を行う。
-- アプリやビルド設定を変更した場合は、Node 24で `yarn gulp:build` の後に `yarn test` を実行し、`yarn lint`・`yarn format:check` も実行する。テスト対象は得点境界・乱数・当たり判定・配信と、Firebase認証・ランキング・保存の契約。lintの警告と整形の指摘も失敗として扱う。Dart Sass・webpack-dev-server・Firebase modular APIを維持する。開発サーバーの設定は `dev-server.cjs` を確認する。
+- アプリやビルド設定を変更した場合は、Node 24で `yarn test`（本番ビルドの後にテストする）・`yarn lint`・`yarn format:check` を実行する。テスト対象は得点境界・乱数・当たり判定・配信と、Firebase認証・ランキング・保存の契約。lintの警告と整形の指摘も失敗として扱う。Dart Sass・webpack-dev-server・Firebase modular APIを維持する。開発サーバーの設定は `dev-server.cjs` を確認する。
 - `application/.env` の値・認証情報をログや文書に転記しない。
 - テスト・動作確認では実Firebaseに接続しない。認証・Firestoreの読み取り・書き込みはモックまたはローカルのFirebase Emulatorで検証する。ブラウザ確認も同様とし、localhostであっても実Firebaseに接続するビルドは使わない。実行前に接続先と通信の分離を確認する。
 - ブラウザ確認用には `application/` で `yarn test:browser:build` を実行し、生成された `.test-browser/` をローカルで配信する。Firebaseをメモリ内のモックに置き換えるため、実際の認証・権限・インデックスの検証にはならない。この生成物はデプロイしない。
