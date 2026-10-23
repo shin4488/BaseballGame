@@ -48,8 +48,8 @@ yarn install
 ### 2. ローカル開発サーバの起動
 
 ```bash
-# Webpack Dev Server を起動（ホットリロード対応）
-yarn dev-server
+# Webpack Dev Server を起動（JS・SCSS・画像の変更でライブリロード）
+yarn gulp
 ```
 
 ブラウザで `http://localhost:4000` を開きます。
