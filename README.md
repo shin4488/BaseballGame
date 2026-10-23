@@ -48,8 +48,8 @@ yarn install
 ### 2. ローカル開発サーバの起動
 
 ```bash
-# Webpack Dev Server を起動（ホットリロード対応）
-yarn dev-server
+# Webpack Dev Server を起動（JS・SCSS・画像の変更でライブリロード）
+yarn gulp
 ```
 
 ブラウザで `http://localhost:4000` を開きます。
@@ -74,8 +74,12 @@ yarn gulp
 # 本番用ビルド（静的解析・バンドル・スタイル生成）
 yarn gulp:build
 
-# 単体テストの実行
+# 本番用ビルドの後に単体テストを実行
 yarn test
+
+# lint・整形の確認
+yarn lint
+yarn format:check
 ```
 
 ---

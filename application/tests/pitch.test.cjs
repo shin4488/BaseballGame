@@ -1,17 +1,17 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const vm = require("node:vm");
-const babel = require("@babel/core");
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const babel = require('@babel/core');
 const cache = new Map();
 function load(file, dependencies = {}, globals = {}) {
   if (!cache.has(file))
     cache.set(
       file,
       babel.transformFileSync(file, {
-        presets: [["@babel/preset-env", { modules: "commonjs" }]],
+        presets: [['@babel/preset-env', { modules: 'commonjs' }]],
         babelrc: false,
         configFile: false,
-      }).code
+      }).code,
     );
   const exports = {};
   vm.runInNewContext(cache.get(file), {
@@ -24,9 +24,9 @@ function load(file, dependencies = {}, globals = {}) {
   });
   return exports;
 }
-const vector = load("src/application/vector/vector2.js");
-const processModule = load("src/application/vue/process.js", {
-  "../vector/vector2": vector,
+const vector = load('src/application/vector/vector2.js');
+const processModule = load('src/application/vue/process.js', {
+  '../vector/vector2': vector,
 });
 const rect = (left, top, width, height) => ({
   left,
@@ -40,7 +40,7 @@ const rect = (left, top, width, height) => ({
 });
 function fixture(
   boards = [{ left: 100, point: 4, out: 0 }],
-  { width = 800, height = 600 } = {}
+  { width = 800, height = 600 } = {},
 ) {
   let now = 0,
     nextId = 0;
@@ -68,18 +68,18 @@ function fixture(
       })),
     getElementById: (id) => ({
       getBoundingClientRect: () =>
-        id === "bat" ? f.bat : rect(f.center.x - 20, f.center.y - 20, 40, 40),
+        id === 'bat' ? f.bat : rect(f.center.x - 20, f.center.y - 20, 40, 40),
     }),
   };
   const mod = load(
-    "src/application/vue/index.js",
+    'src/application/vue/index.js',
     {
-      "../vector/vector2": vector,
-      "../firebase/auth": {},
-      "../firebase/database": {},
-      "./process": { ...processModule, getRandomNumber: () => 21 },
-      "./appConfig": { boardItems: [] },
-      "regenerator-runtime/runtime.js": {},
+      '../vector/vector2': vector,
+      '../firebase/auth': {},
+      '../firebase/database': {},
+      './process': { ...processModule, getRandomNumber: () => 21 },
+      './appConfig': { boardItems: [] },
+      'regenerator-runtime/runtime.js': {},
     },
     {
       window: { document: doc, Promise },
@@ -91,7 +91,7 @@ function fixture(
       clearInterval: (id) => timers.delete(id),
       setTimeout: (fn, delay) => schedule(fn, delay),
       clearTimeout: (id) => timers.delete(id),
-    }
+    },
   );
   const options = mod.createVueInstance();
   f.app = { ...options.data };
@@ -128,16 +128,16 @@ async function hitPath(centers, boards, initialOut = 0) {
     f.center = center;
     await f.advance(30);
   }
-  assert.equal(f.timers.size, 0, "1球が終了し、移動タイマーが残らない");
+  assert.equal(f.timers.size, 0, '1球が終了し、移動タイマーが残らない');
   await pending;
   return f.app;
 }
-test("満塁ホームランの中央を通る高速打球をアウトにしない", async () => {
+test('満塁ホームランの中央を通る高速打球をアウトにしない', async () => {
   const app = await hitPath([83, 62, 41, 20].map((y) => ({ x: 170, y })));
   assert.equal(app.point, 4);
   assert.equal(app.outCount, 0);
 });
-test("フレーム間に的を完全に通過しても得点する", async () => {
+test('フレーム間に的を完全に通過しても得点する', async () => {
   const app = await hitPath([
     { x: 170, y: 90 },
     { x: 170, y: 0 },
@@ -153,7 +153,7 @@ for (const point of [1, 2, 3, 4])
         { x: 170, y: 30 },
         { x: 170, y: 0 },
       ],
-      [{ left: 100, point, out: 0 }]
+      [{ left: 100, point, out: 0 }],
     );
     assert.equal(app.point, point);
     assert.equal(app.outCount, 0);
@@ -167,12 +167,12 @@ for (const out of [1, 2, 3])
         { x: 170, y: 0 },
       ],
       [{ left: 100, point: 0, out }],
-      1
+      1,
     );
     assert.equal(app.point, 0);
     assert.equal(app.outCount, Math.min(3, 1 + out));
   });
-test("的の隙間を抜ける打球はアウト", async () => {
+test('的の隙間を抜ける打球はアウト', async () => {
   const app = await hitPath([
     { x: 350, y: 100 },
     { x: 350, y: 40 },
@@ -181,7 +181,7 @@ test("的の隙間を抜ける打球はアウト", async () => {
   assert.equal(app.point, 0);
   assert.equal(app.outCount, 1);
 });
-test("隣接した的ではDOMの順序でなく先に触れた的を採用する", async () => {
+test('隣接した的ではDOMの順序でなく先に触れた的を採用する', async () => {
   const app = await hitPath(
     [
       { x: 330, y: 90 },
@@ -190,12 +190,12 @@ test("隣接した的ではDOMの順序でなく先に触れた的を採用す�
     [
       { left: 100, point: 0, out: 1 },
       { left: 260, point: 4, out: 0 },
-    ]
+    ],
   );
   assert.equal(app.point, 4);
   assert.equal(app.outCount, 0);
 });
-test("投球が長引いても重複せず、結果表示時間を確保する", async () => {
+test('投球が長引いても重複せず、結果表示時間を確保する', async () => {
   const f = fixture();
   let pitches = 0,
     finish;
@@ -219,7 +219,7 @@ test("投球が長引いても重複せず、結果表示時間を確保する",
   await f.advance(1);
   assert.equal(pitches, 2);
 });
-test("開始の重複呼び出しで複数のゲームを起動しない", async () => {
+test('開始の重複呼び出しで複数のゲームを起動しない', async () => {
   const f = fixture();
   let pitches = 0;
   f.app.throwBall = () => {
@@ -231,7 +231,7 @@ test("開始の重複呼び出しで複数のゲームを起動しない", async
   await f.advance(4000);
   assert.equal(pitches, 1);
 });
-test("3アウト後に追加投球せず結果を表示し、リトライは0から1試合だけ開始する", async () => {
+test('3アウト後に追加投球せず結果を表示し、リトライは0から1試合だけ開始する', async () => {
   const f = fixture();
   let pitches = 0;
   f.app.throwBall = async () => {
@@ -254,7 +254,7 @@ test("3アウト後に追加投球せず結果を表示し、リトライは0か
   assert.equal(pitches, 2);
 });
 
-test("速度11〜30pxと各開始位置の410通りで、的の中央への命中を取りこぼさない", async () => {
+test('速度11〜30pxと各開始位置の410通りで、的の中央への命中を取りこぼさない', async () => {
   let cases = 0;
   for (let speed = 11; speed <= 30; speed++)
     for (let phase = 0; phase < speed; phase++) {
@@ -269,11 +269,11 @@ test("速度11〜30pxと各開始位置の410通りで、的の中央への命�
   assert.equal(cases, 410);
 });
 for (const [name, previous, current, expected] of [
-  ["下面の中央に最初に触れる", { x: 170, y: 90 }, { x: 170, y: 0 }, 1 / 3],
-  ["端点への接線も命中する", { x: 80, y: 90 }, { x: 80, y: 0 }, 5 / 9],
-  ["端点の半径より外は命中しない", { x: 79, y: 90 }, { x: 79, y: 0 }, null],
-  ["投球方向では命中しない", { x: 170, y: 0 }, { x: 170, y: 90 }, null],
-  ["静止したボールを再加点しない", { x: 170, y: 40 }, { x: 170, y: 40 }, null],
+  ['下面の中央に最初に触れる', { x: 170, y: 90 }, { x: 170, y: 0 }, 1 / 3],
+  ['端点への接線も命中する', { x: 80, y: 90 }, { x: 80, y: 0 }, 5 / 9],
+  ['端点の半径より外は命中しない', { x: 79, y: 90 }, { x: 79, y: 0 }, null],
+  ['投球方向では命中しない', { x: 170, y: 0 }, { x: 170, y: 90 }, null],
+  ['静止したボールを再加点しない', { x: 170, y: 40 }, { x: 170, y: 40 }, null],
 ])
   test(name, () => {
     const actual = processModule.getBoardHitTime(previous, current, 20, {
@@ -297,7 +297,7 @@ for (const strikes of [0, 1, 2])
     assert.equal(f.app.outCount, strikes === 2 ? 1 : 0);
     assert.equal(f.app.point, 0);
   });
-test("2ストライクでのファールはアウトにしない", async () => {
+test('2ストライクでのファールはアウトにしない', async () => {
   const f = fixture();
   f.app.strikeCount = 2;
   const pending = f.app.throwBall();
@@ -307,9 +307,9 @@ test("2ストライクでのファールはアウトにしない", async () => {
   await pending;
   assert.equal(f.app.strikeCount, 2);
   assert.equal(f.app.outCount, 0);
-  assert.equal(f.app.message, "ファール");
+  assert.equal(f.app.message, 'ファール');
 });
-test("短い投球では従来の4秒間隔を維持する", async () => {
+test('短い投球では従来の4秒間隔を維持する', async () => {
   const f = fixture();
   let pitches = 0;
   f.app.throwBall = async () => {

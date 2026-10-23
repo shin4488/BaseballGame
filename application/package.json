@@ -9,8 +9,10 @@
     "gulp:build": "gulp build --production",
     "serve": "webpack --mode development --watch",
     "webpack:build": "webpack --mode production",
-    "test": "node --test tests/*.test.cjs",
-    "test:browser:build": "node tests/browser/build.cjs"
+    "test": "gulp build --production && node --test tests/*.test.cjs",
+    "test:browser:build": "node tests/browser/build.cjs",
+    "lint": "eslint --max-warnings 0 .",
+    "format:check": "prettier --check --ignore-path ../.gitignore ."
   },
   "devDependencies": {
     "@babel/core": "^8.0.7",
