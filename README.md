@@ -32,7 +32,7 @@ flowchart LR
 
 ## 開発環境のセットアップ
 
-Node.js 24を使います。Firebaseの接続設定は `application/.env` に書きます。キーは `src/application/firebase/index.js` が読む `FIREBASE_` で始まる環境変数で、値はビルド時にdotenv-webpackがバンドルへ埋め込みます。
+Node.js 24を使います。Firebaseの接続設定は `application/.env` に書きます。キーは `application/src/application/firebase/index.js` が読む `FIREBASE_` で始まる環境変数で、値はビルド時にdotenv-webpackがバンドルへ埋め込みます。
 
 ### 1. 依存パッケージのインストール
 
