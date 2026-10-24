@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="756" viewBox="0 0 900 756" font-family="'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP','Noto Sans CJK JP','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="当たりの範囲（-30度・-60度・水平のバット）">
+<title>当たりの範囲（-30度・-60度・水平のバット）</title>
+<defs><marker id="arrow-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/></marker><marker id="arrow-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#4b5563"/></marker></defs>
+<rect x="0" y="0" width="900" height="756" rx="12" fill="#ffffff"/>
+<text x="24" y="34" font-size="17" fill="#111827" text-anchor="start" font-weight="bold">当たりの範囲: バットの枠から20px以内</text>
+<text x="24" y="58" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">青い範囲にボールの中心が入れば、ボールがバットに重なる。紫の点は回転の中心、縦の点線はボールの通り道（グリップの62px右）。</text>
+<text x="30" y="106" font-size="16" fill="#111827" text-anchor="start" font-weight="bold">-30度</text>
+<g transform="translate(100 130) scale(1.6) rotate(-30)"><rect x="-40" y="-20" width="60" height="160" rx="20" ry="20" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/></g>
+<line x1="199.2" y1="82" x2="199.2" y2="370" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4"/>
+<g transform="translate(100 130) scale(1.6) rotate(-30)"><rect x="-20" y="0" width="20" height="120" fill="none" stroke="#111827" stroke-width="2" vector-effect="non-scaling-stroke" opacity="1"/></g>
+<circle cx="100" cy="130" r="5" fill="#7c3aed"/>
+<circle cx="199.2" cy="146" r="32" fill="#dc2626" fill-opacity="0.18" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/><circle cx="199.2" cy="146" r="2.5" fill="#dc2626"/>
+<text x="239.20000000000002" y="151" font-size="14" fill="#dc2626" text-anchor="start" font-weight="bold">10px下: 外れ</text>
+<circle cx="199.2" cy="234" r="32" fill="#dc2626" fill-opacity="0.18" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/><circle cx="199.2" cy="234" r="2.5" fill="#dc2626"/>
+<text x="239.20000000000002" y="239" font-size="14" fill="#dc2626" text-anchor="start" font-weight="bold">65px下: 外れ</text>
+<circle cx="199.2" cy="290" r="32" fill="#15803d" fill-opacity="0.18" stroke="#15803d" stroke-width="2"/><circle cx="199.2" cy="290" r="2.5" fill="#15803d"/>
+<text x="239.20000000000002" y="295" font-size="14" fill="#15803d" text-anchor="start" font-weight="bold">100px下: 当たり</text>
+<text x="450" y="106" font-size="16" fill="#111827" text-anchor="start" font-weight="bold">-60度</text>
+<g transform="translate(520 130) scale(1.6) rotate(-60)"><rect x="-40" y="-20" width="60" height="160" rx="20" ry="20" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/></g>
+<line x1="619.2" y1="82" x2="619.2" y2="370" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4"/>
+<g transform="translate(520 130) scale(1.6) rotate(-60)"><rect x="-20" y="0" width="20" height="120" fill="none" stroke="#111827" stroke-width="2" vector-effect="non-scaling-stroke" opacity="1"/></g>
+<circle cx="520" cy="130" r="5" fill="#7c3aed"/>
+<circle cx="619.2" cy="138" r="32" fill="#dc2626" fill-opacity="0.18" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/><circle cx="619.2" cy="138" r="2.5" fill="#dc2626"/>
+<text x="723.2" y="143" font-size="14" fill="#dc2626" text-anchor="start" font-weight="bold">5px下: 外れ</text>
+<circle cx="619.2" cy="210" r="32" fill="#15803d" fill-opacity="0.18" stroke="#15803d" stroke-width="2"/><circle cx="619.2" cy="210" r="2.5" fill="#15803d"/>
+<text x="723.2" y="215" font-size="14" fill="#15803d" text-anchor="start" font-weight="bold">50px下: 当たり</text>
+<circle cx="619.2" cy="282" r="32" fill="#dc2626" fill-opacity="0.18" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/><circle cx="619.2" cy="282" r="2.5" fill="#dc2626"/>
+<text x="723.2" y="287" font-size="14" fill="#dc2626" text-anchor="start" font-weight="bold">95px下: 外れ</text>
+<text x="24" y="384" font-size="16" fill="#111827" text-anchor="start" font-weight="bold">水平（-90度）</text>
+<g transform="translate(230 480) scale(2) rotate(-90)"><rect x="-40" y="-20" width="60" height="160" rx="20" ry="20" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/></g>
+<line x1="354" y1="370" x2="354" y2="680" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4"/>
+<g transform="translate(230 480) scale(2) rotate(-90)"><rect x="-20" y="0" width="20" height="120" fill="none" stroke="#111827" stroke-width="2" vector-effect="non-scaling-stroke" opacity="1"/></g>
+<circle cx="230" cy="480" r="5" fill="#7c3aed"/>
+<circle cx="354" cy="440" r="40" fill="#15803d" fill-opacity="0.18" stroke="#15803d" stroke-width="2"/><circle cx="354" cy="440" r="2.5" fill="#15803d"/>
+<circle cx="354" cy="560" r="40" fill="#15803d" fill-opacity="0.18" stroke="#15803d" stroke-width="2"/><circle cx="354" cy="560" r="2.5" fill="#15803d"/>
+<circle cx="354" cy="620" r="40" fill="#dc2626" fill-opacity="0.18" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/><circle cx="354" cy="620" r="2.5" fill="#dc2626"/>
+<line x1="190" y1="480" x2="520" y2="480" stroke="#111827" stroke-width="1.2" stroke-dasharray="2 3"/>
+<line x1="190" y1="520" x2="520" y2="520" stroke="#111827" stroke-width="1.2" stroke-dasharray="2 3"/>
+<text x="530" y="485" font-size="13" fill="#111827" text-anchor="start" font-weight="normal">上のライン</text>
+<text x="530" y="525" font-size="13" fill="#111827" text-anchor="start" font-weight="normal">下のライン</text>
+<line x1="170" y1="440" x2="170" y2="480" stroke="#4b5563" stroke-width="1.2" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+<text x="164" y="465" font-size="14" fill="#4b5563" text-anchor="end" font-weight="normal">20px</text>
+<line x1="114" y1="480" x2="114" y2="560" stroke="#4b5563" stroke-width="1.2" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+<text x="108" y="525" font-size="14" fill="#4b5563" text-anchor="end" font-weight="normal">40px</text>
+<line x1="108" y1="480" x2="190" y2="480" stroke="#9ca3af" stroke-width="1"/>
+<line x1="164" y1="440" x2="190" y2="440" stroke="#9ca3af" stroke-width="1"/>
+<line x1="108" y1="560" x2="190" y2="560" stroke="#9ca3af" stroke-width="1"/>
+<line x1="398" y1="440" x2="524" y2="440" stroke="#15803d" stroke-width="1" stroke-dasharray="1 3"/>
+<text x="530" y="445" font-size="14" fill="#15803d" text-anchor="start" font-weight="bold">20px上: 当たり（上のラインに触れる）</text>
+<line x1="398" y1="560" x2="524" y2="560" stroke="#15803d" stroke-width="1" stroke-dasharray="1 3"/>
+<text x="530" y="565" font-size="14" fill="#15803d" text-anchor="start" font-weight="bold">40px下: 当たり（下のラインに触れる）</text>
+<line x1="398" y1="620" x2="524" y2="620" stroke="#dc2626" stroke-width="1" stroke-dasharray="1 3"/>
+<text x="530" y="625" font-size="14" fill="#dc2626" text-anchor="start" font-weight="bold">70px下: 外れ</text>
+<text x="24" y="710" font-size="14" fill="#111827" text-anchor="start" font-weight="normal">ボールの中心が、上のラインの20px上から40px下（下のラインの20px下）までなら当たり、41px下からは外れ。</text>
+<text x="24" y="734" font-size="14" fill="#111827" text-anchor="start" font-weight="normal">ボールの上側が下のラインに触れるだけの場合も、画面上は当たって見えるため当たりにする。</text>
+</svg>
