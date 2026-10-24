@@ -46,9 +46,11 @@ test('乱数の両端を含み、同じ上下限にも対応する', (t) => {
     Math.random = random;
   });
   Math.random = () => 0;
-  assert.equal(getRandomNumber(10, 3), 3);
+  assert.equal(getRandomNumber(3, 10), 3);
+  assert.equal(getRandomNumber(-30, 30), -30);
   Math.random = () => 0.999999;
-  assert.equal(getRandomNumber(10, 3), 10);
+  assert.equal(getRandomNumber(3, 10), 10);
+  assert.equal(getRandomNumber(-30, 30), 30);
   assert.equal(getRandomNumber(3, 3), 3);
 });
 test('ベクトルの大きさはx・y両方の成分から求める', () => {

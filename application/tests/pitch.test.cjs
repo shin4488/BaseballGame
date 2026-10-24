@@ -40,7 +40,7 @@ const rect = (left, top, width, height) => ({
 });
 function fixture(
   boards = [{ left: 100, point: 4, out: 0 }],
-  { width = 800, height = 600 } = {},
+  { width = 800, height = 600, random } = {},
 ) {
   let now = 0,
     nextId = 0;
@@ -77,7 +77,17 @@ function fixture(
       '../vector/vector2': vector,
       '../firebase/auth': {},
       '../firebase/database': {},
-      './process': { ...processModule, getRandomNumber: () => 21 },
+      // randomを指定したときは、Math.randomだけを固定した実際の乱数関数を使う。
+      './process':
+        random === undefined
+          ? { ...processModule, getRandomNumber: () => 21 }
+          : load(
+              'src/application/vue/process.js',
+              { '../vector/vector2': vector },
+              {
+                Math: Object.create(Math, { random: { value: () => random } }),
+              },
+            ),
       './appConfig': { boardItems: [] },
       'regenerator-runtime/runtime.js': {},
     },
@@ -254,9 +264,25 @@ test('3アウト後に追加投球せず結果を表示し、リトライは0か
   assert.equal(pitches, 2);
 });
 
-test('速度11〜30pxと各開始位置の410通りで、的の中央への命中を取りこぼさない', async () => {
+for (const [random, speed, xSpeed] of [
+  [0, 10, -30],
+  [0.999999, 30, 30],
+])
+  test(`乱数が${random}のとき、投球は${speed}px、打球の横方向は${xSpeed}pxずつ動く`, async () => {
+    const f = fixture(undefined, { random });
+    const pending = f.app.throwBall();
+    await f.advance(30); // バットで打ち返す。
+    f.bat = rect(600, 500, 20, 100);
+    await f.advance(30);
+    assert.equal(f.app.yBallPosition, -speed);
+    assert.equal(f.app.xBallPosition, xSpeed);
+    f.center = { x: 170, y: 0 };
+    await f.advance(30);
+    await pending;
+  });
+test('速度10〜30pxと各開始位置の420通りで、的の中央への命中を取りこぼさない', async () => {
   let cases = 0;
-  for (let speed = 11; speed <= 30; speed++)
+  for (let speed = 10; speed <= 30; speed++)
     for (let phase = 0; phase < speed; phase++) {
       const centers = [];
       for (let y = 70 + phase; y >= -30; y -= speed)
@@ -266,7 +292,7 @@ test('速度11〜30pxと各開始位置の410通りで、的の中央への命�
       assert.equal(app.outCount, 0);
       cases++;
     }
-  assert.equal(cases, 410);
+  assert.equal(cases, 420);
 });
 for (const [name, previous, current, expected] of [
   ['下面の中央に最初に触れる', { x: 170, y: 90 }, { x: 170, y: 0 }, 1 / 3],

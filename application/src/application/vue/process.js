@@ -90,9 +90,9 @@ export const getBoardHitTime = (previous, current, radius, board) => {
 };
 
 /**
- * min以上max以下の整数の乱数を返す。引数の順はmax、min。
+ * min以上max以下の整数の乱数を返す。
  */
-export const getRandomNumber = (max, min) => {
+export const getRandomNumber = (min, max) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
