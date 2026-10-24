@@ -36,7 +36,6 @@ export const createVueInstance = () => {
       boardItemStyleComputed() {
         return `height: ${this.ballSize}px;`;
       },
-      /** マウンドの初期Y座標 */
       moundYPositionComputed() {
         return this.viewportHeight / 5;
       },
@@ -53,7 +52,6 @@ export const createVueInstance = () => {
       batYPositionComputed() {
         return this.viewportHeight - this.batInitHeight * 1.5;
       },
-      /** 打つボタンの初期Y座標 */
       hitButtonYPositionComputed() {
         return this.batYPositionComputed + this.batInitHeight;
       },
@@ -320,7 +318,7 @@ export const createVueInstance = () => {
       },
 
       async initializeTopMenuData() {
-        // 取得を重ねて呼んだ場合に、先の呼び出しの遅い応答で新しい結果を上書きしない。
+        // ランキングの取得が重なったときに、先に始めた取得の応答が後から届いても、新しい結果を上書きしない。
         const requestId = ++this.rankingsRequestId;
         const sources = [
           ['history', () => FireStoreExtention.getRankingHistory()],
@@ -534,7 +532,7 @@ export const createVueInstance = () => {
               return;
             }
 
-            // フェアゾーンに打ち返して盤に当たらなかったときはアウト
+            // フェアゾーンに打ち返して的に当たらなかったときはアウト
             if (ballPosition.top <= 0) {
               this.outCount += 1;
               this.strikeCount = 0;

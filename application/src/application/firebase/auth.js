@@ -7,9 +7,6 @@ import {
 } from 'firebase/auth';
 import 'regenerator-runtime/runtime.js';
 
-/**
- * firebaseハンドラー
- */
 export class FirebaseAuth {
   /**
    * Firebase Authenticationがログイン状態を確定させた最初の通知まで待つ。

@@ -28,7 +28,6 @@ module.exports = (env, argv) => {
             and: [/node_modules/, /dist/, /publish/, /1.0.*/],
           },
           use: {
-            // 対象ブラウザが対応していない構文をBabelで変換する
             loader: 'babel-loader',
             options: {
               presets: [

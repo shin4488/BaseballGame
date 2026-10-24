@@ -26,11 +26,13 @@ flowchart LR
 
 | 区分 | 使用技術 |
 | --- | --- |
-| 画面 | Vue.js 2・Bootstrap 5（CDNから読み込む） |
+| 画面 | Vue.js 2・Bootstrap 5（どちらもCDNから読み込む） |
 | ビルド | webpack、Babel、Gulp、Dart Sass |
 | 外部サービス・配信 | Firebase（Authentication・Cloud Firestore・Analytics）、Nginx、Docker Compose |
 
 ## 開発環境のセットアップ
+
+Node.js 24を使います。Firebaseの接続設定は `application/.env` に書きます。キーは `src/application/firebase/index.js` が読む `FIREBASE_` で始まる環境変数で、値はビルド時にdotenv-webpackがバンドルへ埋め込みます。
 
 ### 1. 依存パッケージのインストール
 
@@ -55,7 +57,7 @@ yarn gulp
 docker compose up -d
 ```
 
-Nginxが `application/dist`（`yarn gulp` の出力）を `https://localhost` で配信します。証明書はイメージの作成時に生成する自己署名証明書のため、ブラウザが警告を表示します。`docker-compose.yaml` が `application/.env` を読み込むため、このファイルも必要です。
+Nginxが `application/dist`（`yarn gulp` の出力）を `https://localhost` で配信します。証明書はイメージの作成時に生成する自己署名証明書のため、ブラウザが警告を表示します。
 
 ## ビルドとテスト
 

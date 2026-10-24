@@ -2,7 +2,7 @@ import Vector2 from '../vector/vector2';
 
 /**
  * 円（ボール）が線分（バット）に当たっているかを判定する。
- * maxAllowedLateHitは円の中心から線分までの符号付き距離の下限。負の値にすると、円の中心が線分より下へ越えた振り遅れも、その距離までは当たりにする。
+ * maxAllowedLateHitは、円の中心から線分を延ばした直線までの符号付き距離（始点が左・終点が右の線分では上側が正）の下限。負の値にすると、円の中心が線分より下にある振り遅れも、その距離までは当たりにする。
  */
 export const isHitCircleToLine = (
   lineStartVec2,
@@ -15,7 +15,7 @@ export const isHitCircleToLine = (
   const lineStartToCircleCenter = Vector2.sub(circleCentervec2, lineStartVec2);
   const lineEndToCircleCenter = Vector2.sub(circleCentervec2, lineEndVec2);
 
-  // 円の中心から、線分を延ばした直線までの符号付き距離。始点が左・終点が右の線分では、円の中心が上側にあると正になる。
+  // 円の中心から、線分を延ばした直線までの符号付き距離
   const minDistanceLineToCircle = Vector2.cross(
     lineStartToCircleCenter,
     lineStartToEnd.normarized,

@@ -98,7 +98,7 @@ for (const [loginUserName, guestNumber, expected] of [
     assert.equal(app.playerNameComputed, expected);
   });
 }
-test('的は従来と同じ高さ40pxを持ち、下面の当たり判定位置を保つ', () => {
+test('的の高さをボールの直径と同じ40pxにする', () => {
   const { app } = fixture(390, 844);
   assert.match(app.boardItemStyleComputed, /height: 40px/);
 });
