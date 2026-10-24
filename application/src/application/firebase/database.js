@@ -76,13 +76,12 @@ export class FireStore {
   }
 
   /**
-   * 任意のユーザIDを生成します
-   * ゲストユーザにのみ使用してください
-   * @returns
+   * ゲストIDに使う10桁の連番と乱数文字列を作る。
+   * ログインユーザーのIDにはFirebase AuthenticationのUIDを使うため、ゲストのコレクションでだけ使う。
    */
   async createUserId() {
     try {
-      // IDの推測を防ぐ乱数は維持し、表示番号だけを共有カウンターで発番する。
+      // IDの推測を防ぐため乱数を付け、表示番号だけを共有カウンターで発番する。
       const randomBytes = window.crypto.getRandomValues(new Uint8Array(16));
       const randomString = Array.from(randomBytes, (byte) =>
         byte.toString(16).padStart(2, '0'),
@@ -129,11 +128,6 @@ export class FireStore {
     }
   }
 
-  /**
-   * データ更新
-   * upsertでランキングデータを追加
-   * @param {*} parameter
-   */
   async upsertRanking(parameter) {
     const documentId = parameter.documentId;
     const targetData = {
@@ -152,10 +146,6 @@ export class FireStore {
     );
   }
 
-  /**
-   * ランキングの削除
-   * @param {*} documentId
-   */
   async deleteRanking(documentId) {
     await deleteDoc(doc(this._firestore, this._collection, documentId));
   }
@@ -200,8 +190,7 @@ export class FireStoreExtention {
   }
 
   /**
-   * ランキングで並び替え
-   * @param {*} rankingList
+   * 得点順に並べ替え、上位10件を返す。
    */
   static sortByRankingLastUpdated(rankingList) {
     // 同点では先に記録した人を上位にする。後段の安定ソートでも日時順を保つため、先に日時で並べる。

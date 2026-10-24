@@ -1,13 +1,8 @@
 import Vector2 from '../vector/vector2';
 
 /**
- * 円と線分の当たり判定
- * @param {*} lineStartVec2
- * @param {*} lineEndVec2
- * @param {*} circleCentervec2
- * @param {*} circleRadius
- * @param {*} maxAllowedLateHIt
- * @returns
+ * 円（ボール）が線分（バット）に当たっているかを判定する。
+ * maxAllowedLateHitは、円の中心から線分を延ばした直線までの符号付き距離（始点が左・終点が右の線分では上側が正）の下限。負の値にすると、円の中心が線分より下にある振り遅れも、その距離までは当たりにする。
  */
 export const isHitCircleToLine = (
   lineStartVec2,
@@ -20,14 +15,12 @@ export const isHitCircleToLine = (
   const lineStartToCircleCenter = Vector2.sub(circleCentervec2, lineStartVec2);
   const lineEndToCircleCenter = Vector2.sub(circleCentervec2, lineEndVec2);
 
-  // 『「円の中心」と「線分」の最短距離 < 円の半径』のチェック
+  // 円の中心から、線分を延ばした直線までの符号付き距離
   const minDistanceLineToCircle = Vector2.cross(
     lineStartToCircleCenter,
     lineStartToEnd.normarized,
   );
 
-  // 「円の中心」と「線分」の最短距離が、円の半径より大きい時は当たっていない
-  // ボールが線分より下にあるのをどこまで許容するかは個別処理側で決める
   if (
     minDistanceLineToCircle < maxAllowedLateHit ||
     minDistanceLineToCircle >= circleRadius
@@ -35,7 +28,7 @@ export const isHitCircleToLine = (
     return false;
   }
 
-  // 円が線分の範囲内にあることのチェック
+  // 円の中心から直線へ下ろした垂線の足が、線分の両端の間にあるか
   const dotLineStartCircleCenter = Vector2.dot(
     lineStartToEnd,
     lineStartToCircleCenter,
@@ -47,14 +40,13 @@ export const isHitCircleToLine = (
   const isCircleWithinLine =
     dotLineStartCircleCenter * dotLineEndCircleCenter <= 0;
 
-  // 円が線分の末端内にあることのチェック
+  // 線分の端点が円の内側にあるか
   const magnitudeLineStartToCircleCenter = lineStartToCircleCenter.magnitude;
   const magnitudeLineEndToCircleCenter = lineEndToCircleCenter.magnitude;
   const isCircleWithinLineEdge =
     magnitudeLineStartToCircleCenter < circleRadius ||
     magnitudeLineEndToCircleCenter < circleRadius;
 
-  // 当たり判定
   return isCircleWithinLine || isCircleWithinLineEdge;
 };
 
@@ -98,20 +90,12 @@ export const getBoardHitTime = (previous, current, radius, board) => {
 };
 
 /**
- * 乱数発生
- * @param {*} max
- * @param {*} min
- * @returns
+ * min以上max以下の整数の乱数を返す。引数の順はmax、min。
  */
 export const getRandomNumber = (max, min) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
-/**
- * 得点時応じて結果メッセージを取得
- * @param {*} totalPoint
- * @returns
- */
 export const getResultMessage = (totalPoint) => {
   const pointMessage = ` ${totalPoint} 得点`;
   return totalPoint === 0

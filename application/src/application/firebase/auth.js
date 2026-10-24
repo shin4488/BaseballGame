@@ -7,13 +7,10 @@ import {
 } from 'firebase/auth';
 import 'regenerator-runtime/runtime.js';
 
-/**
- * firebaseハンドラー
- */
 export class FirebaseAuth {
   /**
-   * ログイン状態の変更検知処理
-   * @returns
+   * Firebase Authenticationがログイン状態を確定させた最初の通知まで待つ。
+   * 以降のログイン・ログアウトの通知でも、保持するユーザー情報を更新し続ける。
    */
   async watchStateChanged() {
     return new window.Promise((resolve) => {
@@ -32,9 +29,6 @@ export class FirebaseAuth {
     });
   }
 
-  /**
-   * Googleログイン処理
-   */
   async signInWithPopupToGoogle() {
     const provider = new GoogleAuthProvider();
 
@@ -48,9 +42,6 @@ export class FirebaseAuth {
     }
   }
 
-  /**
-   * ログアウト処理
-   */
   async signOutFromGoogle() {
     await signOut(getAuth());
   }
@@ -81,9 +72,6 @@ export class FirebaseAuth {
 export class FirebaseAuthExtention {
   static auth;
 
-  /**
-   * 初期化処理
-   */
   static async init() {
     FirebaseAuthExtention.auth = new FirebaseAuth();
     await FirebaseAuthExtention.auth.watchStateChanged();

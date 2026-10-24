@@ -14,7 +14,7 @@ exports.createDevServer = ({ port = 4000, open = true } = {}) => {
       liveReload: true,
       client: { overlay: false },
       static: { directory: path.resolve(__dirname, 'dist'), watch: true },
-      // nginx経由の従来の配信でも最新のバンドルを利用できるようにする。
+      // nginxでの配信確認でも最新のバンドルを使えるよう、メモリ上だけでなくdist/にも書き出す。
       devMiddleware: { writeToDisk: true },
     },
     compiler,

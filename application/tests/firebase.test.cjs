@@ -351,7 +351,7 @@ test('保存は同じIDへマージし、削除は指定IDだけを対象にす�
     { db: 'database', name: 'guests', id: 'guest-2' },
   ]);
 });
-test('読み取り失敗を従来のメッセージで伝える', async () => {
+test('読み取り失敗を、今週と歴代で異なるメッセージで伝える', async () => {
   for (const [method, message] of [
     ['getRankingHistory', 'Ranking Fetch Error2'],
     ['getRankingThisWeek', 'Ranking Fetch Error1'],

@@ -309,7 +309,7 @@ test('2ストライクでのファールはアウトにしない', async () => {
   assert.equal(f.app.outCount, 0);
   assert.equal(f.app.message, 'ファール');
 });
-test('短い投球では従来の4秒間隔を維持する', async () => {
+test('短い投球では4秒間隔で次の球を投げる', async () => {
   const f = fixture();
   let pitches = 0;
   f.app.throwBall = async () => {

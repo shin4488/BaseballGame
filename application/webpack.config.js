@@ -7,8 +7,7 @@ module.exports = (env, argv) => {
   const outputDirectory = isDevelopment ? 'dist' : 'publish';
 
   return {
-    // 必ずしもmode指定できる値がargv.modeに入っているとは限らないため文字列で指定している
-    // 開発環境以外は全て本番とする
+    // argv.modeにはwebpackのmodeに指定できない値（未指定を含む）が入り得るため、development以外はすべてproductionとして扱う
     mode: isDevelopment ? 'development' : 'production',
     entry: path.resolve(__dirname, 'src', 'main.js'),
     output: {
@@ -29,7 +28,6 @@ module.exports = (env, argv) => {
             and: [/node_modules/, /dist/, /publish/, /1.0.*/],
           },
           use: {
-            // Android端末などではimportが使用できないため、Babelで変換
             loader: 'babel-loader',
             options: {
               presets: [

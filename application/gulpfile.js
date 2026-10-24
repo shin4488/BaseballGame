@@ -31,7 +31,6 @@ const sassTask = () =>
     .pipe(sass.sync())
     .pipe(dest(path.resolve(outputPath, 'style')));
 
-// eslint適用
 const lint = async () => {
   const eslint = new ESLint();
   const results = await eslint.lintFiles(['**/*.js']);
@@ -45,7 +44,6 @@ const lint = async () => {
   }
 };
 
-// webpack呼び出し
 const bundle = () =>
   webpackStream(
     webpackConfig(undefined, {
@@ -58,7 +56,7 @@ const startDevServer = async () => {
   const { createDevServer } = require('./dev-server.cjs');
   const server = createDevServer();
   await server.start();
-  // JSはWebpack、画像とSCSSはGulpで監視する。HTML/画像/CSSの変更もライブリロードする。
+  // JSのバンドルはWebpack、lint・SCSS・画像はGulpで監視する。HTML/画像/CSSの変更もライブリロードする。
   watch('./src/**/*.js', lint);
   watch('./src/style/**', sassTask);
   watch('./src/image/**', copyAssets);

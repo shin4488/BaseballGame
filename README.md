@@ -1,17 +1,12 @@
 # BaseballGame
 
-ブラウザ上で手軽に遊べる野球シミュレーション／アクションゲームです。  
-打撃・投球などの操作判定や試合進行、Firebaseと連携したスコア保存・ランキング機能を提供します。
-
----
+ブラウザで遊ぶ野球ゲーム「満塁野球」です。満塁の場面で、自動で投げられるボールを「打つ」ボタンで打ち返し、3アウトまでの得点を競います。
 
 ## 主な機能
 
-- **試合プレイ**: ブラウザ上での直感的なバッティング・ピッチング操作と試合進行。
-- **データ連携**: Firebase Authentication によるユーザー認証と、Firebase Realtime Database を活用したハイスコア記録・ランキング表示。
-- **マルチデバイス対応**: レスポンシブな画面設計。
-
----
+- 打球が当たった的に応じて、1〜4点の得点か1〜3個のアウトになります。的に当たらずに画面の上端まで飛んだ打球もアウトです。的の数は画面幅に合わせて2〜4個に変わります。
+- Googleアカウント（Firebase Authentication）でログインするか、ゲストとして遊べます。
+- 結果をCloud Firestoreに保存し、直近7日間（画面上は「今週」）と歴代の得点ランキングを上位10件ずつ表示します。記録はログインユーザー・ゲスト番号ごとに1件で、保存すると上書きします。ログインユーザーは自分の記録を削除できます。
 
 ## ゲスト番号
 
@@ -21,22 +16,23 @@
 
 カウンターはランキング用のフィールドを持たず、ランキングには表示されません。発行済み番号の再利用を防ぐため、`guests/_sequence` を削除したり `lastNumber` を減らしたりしないでください。ゲストのスコア用ドキュメントは結果保存時に作成します。
 
----
-
 ## システム構成
 
 ```mermaid
 flowchart LR
     Browser["ブラウザ (Vue.js / UI)"] --> Nginx["配信サーバ (Nginx / Docker)"]
-    Browser -->|"認証 / スコア保存"| Firebase["Firebase<br>(Auth & Realtime Database)"]
+    Browser -->|"認証 / スコア保存・ランキング取得"| Firebase["Firebase<br>(Authentication / Cloud Firestore)"]
 ```
 
-- **フロントエンド**: Vue.js, Webpack, Gulp, Dart Sass
-- **バックエンド/インフラ**: Firebase (Auth / Database), Nginx, Docker Compose
-
----
+| 区分 | 使用技術 |
+| --- | --- |
+| 画面 | Vue.js 2・Bootstrap 5（どちらもCDNから読み込む） |
+| ビルド | webpack、Babel、Gulp、Dart Sass |
+| 外部サービス・配信 | Firebase（Authentication・Cloud Firestore・Analytics）、Nginx、Docker Compose |
 
 ## 開発環境のセットアップ
+
+Node.js 24を使います。Firebaseの接続設定は `application/.env` に書きます。キーは `application/src/application/firebase/index.js` が読む `FIREBASE_` で始まる環境変数で、値はビルド時にdotenv-webpackがバンドルへ埋め込みます。
 
 ### 1. 依存パッケージのインストール
 
@@ -61,15 +57,12 @@ yarn gulp
 docker compose up -d
 ```
 
----
+Nginxが `application/dist`（`yarn gulp` の出力）を `https://localhost` で配信します。証明書はイメージの作成時に生成する自己署名証明書のため、ブラウザが警告を表示します。
 
 ## ビルドとテスト
 
 ```bash
 cd application
-
-# 開発用ビルド・ファイル監視
-yarn gulp
 
 # 本番用ビルド（静的解析・バンドル・スタイル生成）
 yarn gulp:build
@@ -82,16 +75,14 @@ yarn lint
 yarn format:check
 ```
 
----
-
 ## ディレクトリ構成
 
 ```text
 BaseballGame/
 ├── application/             # ゲームクライアントのソースコード
-│   ├── src/                 # Vueコンポーネント、ゲーム進行ロジック、Firebase連携
-│   ├── tests/               # 境界値・判定・外部連携のテストスイート
+│   ├── src/                 # 画面（index.html・Vueインスタンス）、ゲーム進行、Firebase連携
+│   ├── tests/               # 単体テスト（node:test）と、Firebaseをモックしたブラウザ確認用ビルド
 │   └── package.json
-├── web/                     # Nginx の配信設定
+├── web/                     # NginxのDockerfileと設定
 └── docker-compose.yaml      # コンテナ実行定義
 ```
