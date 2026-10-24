@@ -22,7 +22,7 @@ export default class Vector2 {
 
   get magnitude() {
     const { x, y } = this;
-    return Math.sqrt(x ** 2, y ** 2);
+    return Math.sqrt(x ** 2 + y ** 2);
   }
 
   get normarized() {

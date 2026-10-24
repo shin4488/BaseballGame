@@ -51,6 +51,73 @@ test('乱数の両端を含み、同じ上下限にも対応する', (t) => {
   assert.equal(getRandomNumber(10, 3), 10);
   assert.equal(getRandomNumber(3, 3), 3);
 });
+test('ベクトルの大きさはx・y両方の成分から求める', () => {
+  assert.equal(new Vector2(3, 4).magnitude, 5);
+  assert.equal(new Vector2(-3, -4).magnitude, 5);
+  const unit = new Vector2(3, 4).normarized;
+  assert.equal(unit.x, 0.6);
+  assert.equal(unit.y, 0.8);
+});
+// ゲームと同じく、半径20pxのボールと、下へ70pxまでの振り遅れを当たりとする水平なバットで調べる。
+for (const [name, center, expected] of [
+  [
+    'バットの右端から右へ10px・下へ15px（端点まで18px）は当たる',
+    [110, 15],
+    true,
+  ],
+  [
+    'バットの左端から左へ10px・上へ15px（端点まで18px）は当たる',
+    [-10, -15],
+    true,
+  ],
+  [
+    'バットの右端から右へ15px・下へ15px（端点まで21px）は外れる',
+    [115, 15],
+    false,
+  ],
+  [
+    'バットの右端から右へ10px・下へ50px（端点まで51px）は外れる',
+    [110, 50],
+    false,
+  ],
+  ['バットの両端の間なら、下へ50pxの振り遅れも当たる', [100, 50], true],
+])
+  test(name, () =>
+    assert.equal(
+      isHitCircleToLine(
+        new Vector2(0, 0),
+        new Vector2(100, 0),
+        new Vector2(...center),
+        20,
+        -70,
+      ),
+      expected,
+    ),
+  );
+test('斜めの線分では、線分を延ばした直線までの距離で判定する', () => {
+  // 直線までの距離は (60 - 40) / √2 ≈ 14.1px で、半径の20px未満
+  assert.equal(
+    isHitCircleToLine(
+      new Vector2(0, 0),
+      new Vector2(100, 100),
+      new Vector2(60, 40),
+      20,
+      -20,
+    ),
+    true,
+  );
+  // 直線までの距離は (65 - 35) / √2 ≈ 21.2px
+  assert.equal(
+    isHitCircleToLine(
+      new Vector2(0, 0),
+      new Vector2(100, 100),
+      new Vector2(65, 35),
+      20,
+      -20,
+    ),
+    false,
+  );
+});
 test('水平バットの中央で当たり、十分離れたボールは外れる', () => {
   assert.equal(
     isHitCircleToLine(
