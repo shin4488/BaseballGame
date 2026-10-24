@@ -1,4 +1,3 @@
-version: "3"
 services:
     # nginxで、ビルドした野球ゲーム（application/dist）を配信する
     web-server:
