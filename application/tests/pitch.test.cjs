@@ -40,7 +40,7 @@ const rect = (left, top, width, height) => ({
 });
 function fixture(
   boards = [{ left: 100, point: 4, out: 0 }],
-  { width = 800, height = 600 } = {},
+  { width = 800, height = 600, random } = {},
 ) {
   let now = 0,
     nextId = 0;
@@ -50,9 +50,10 @@ function fixture(
     timers.set(id, { fn, at: now + delay, delay, repeat });
     return id;
   };
+  // batは、回転前のバットの要素の左上（offsetLeft・offsetTop）。
   const f = {
     center: { x: 170, y: 300 },
-    bat: rect(100, 300, 150, 20),
+    bat: { left: 88, top: 300 },
     boards,
   };
   const doc = {
@@ -66,10 +67,13 @@ function fixture(
         },
         getBoundingClientRect: () => rect(b.left, 0, 150, 40),
       })),
-    getElementById: (id) => ({
-      getBoundingClientRect: () =>
-        id === 'bat' ? f.bat : rect(f.center.x - 20, f.center.y - 20, 40, 40),
-    }),
+    getElementById: (id) =>
+      id === 'bat'
+        ? { offsetLeft: f.bat.left, offsetTop: f.bat.top }
+        : {
+            getBoundingClientRect: () =>
+              rect(f.center.x - 20, f.center.y - 20, 40, 40),
+          },
   };
   const mod = load(
     'src/application/vue/index.js',
@@ -77,7 +81,17 @@ function fixture(
       '../vector/vector2': vector,
       '../firebase/auth': {},
       '../firebase/database': {},
-      './process': { ...processModule, getRandomNumber: () => 21 },
+      // randomを指定したときは、Math.randomだけを固定した実際の乱数関数を使う。
+      './process':
+        random === undefined
+          ? { ...processModule, getRandomNumber: () => 21 }
+          : load(
+              'src/application/vue/process.js',
+              { '../vector/vector2': vector },
+              {
+                Math: Object.create(Math, { random: { value: () => random } }),
+              },
+            ),
       './appConfig': { boardItems: [] },
       'regenerator-runtime/runtime.js': {},
     },
@@ -94,7 +108,8 @@ function fixture(
     },
   );
   const options = mod.createVueInstance();
-  f.app = { ...options.data };
+  // 既定では、バットを水平（-90度）に止め、グリップ側の端(108, 300)から右へ伸びる上のラインに、ボールの中心(170, 300)を重ねる。
+  f.app = { ...options.data, batRotateDegree: -90 };
   for (const [key, getter] of Object.entries(options.computed))
     Object.defineProperty(f.app, key, { get: () => getter.call(f.app) });
   for (const [key, method] of Object.entries(options.methods))
@@ -123,7 +138,7 @@ async function hitPath(centers, boards, initialOut = 0) {
   f.app.outCount = initialOut;
   const pending = f.app.throwBall();
   await f.advance(30); // バットで打ち返す。
-  f.bat = rect(600, 500, 20, 100);
+  f.bat = { left: 600, top: 500 };
   for (const center of centers) {
     f.center = center;
     await f.advance(30);
@@ -254,9 +269,25 @@ test('3アウト後に追加投球せず結果を表示し、リトライは0か
   assert.equal(pitches, 2);
 });
 
-test('速度11〜30pxと各開始位置の410通りで、的の中央への命中を取りこぼさない', async () => {
+for (const [random, speed, xSpeed] of [
+  [0, 10, -30],
+  [0.999999, 30, 30],
+])
+  test(`乱数が${random}のとき、投球は${speed}px、打球の横方向は${xSpeed}pxずつ動く`, async () => {
+    const f = fixture(undefined, { random });
+    const pending = f.app.throwBall();
+    await f.advance(30); // バットで打ち返す。
+    f.bat = { left: 600, top: 500 };
+    await f.advance(30);
+    assert.equal(f.app.yBallPosition, -speed);
+    assert.equal(f.app.xBallPosition, xSpeed);
+    f.center = { x: 170, y: 0 };
+    await f.advance(30);
+    await pending;
+  });
+test('速度10〜30pxと各開始位置の420通りで、的の中央への命中を取りこぼさない', async () => {
   let cases = 0;
-  for (let speed = 11; speed <= 30; speed++)
+  for (let speed = 10; speed <= 30; speed++)
     for (let phase = 0; phase < speed; phase++) {
       const centers = [];
       for (let y = 70 + phase; y >= -30; y -= speed)
@@ -266,7 +297,7 @@ test('速度11〜30pxと各開始位置の410通りで、的の中央への命�
       assert.equal(app.outCount, 0);
       cases++;
     }
-  assert.equal(cases, 410);
+  assert.equal(cases, 420);
 });
 for (const [name, previous, current, expected] of [
   ['下面の中央に最初に触れる', { x: 170, y: 90 }, { x: 170, y: 0 }, 1 / 3],
@@ -287,7 +318,7 @@ for (const [name, previous, current, expected] of [
 for (const strikes of [0, 1, 2])
   test(`空振りはストライク${strikes}から規定どおり増える`, async () => {
     const f = fixture();
-    f.bat = rect(600, 500, 20, 100);
+    f.bat = { left: 600, top: 500 };
     f.app.strikeCount = strikes;
     const pending = f.app.throwBall();
     f.center = { x: 170, y: 550 };
@@ -297,6 +328,77 @@ for (const strikes of [0, 1, 2])
     assert.equal(f.app.outCount, strikes === 2 ? 1 : 0);
     assert.equal(f.app.point, 0);
   });
+// グリップ側の端が(108, 420)のバット。ゲームと同じく、ボールの中心がグリップの100px下を過ぎるとストライクになる。
+const batAtGameHeight = { left: 88, top: 420 };
+test('判定と判定の間にバットがボールを通り過ぎても、打ち返す', async () => {
+  // 60msの判定は-30度でグリップの55px下、90msの判定は-60度で85px下。どちらの時点もバットに触れていない。
+  const f = fixture();
+  f.bat = batAtGameHeight;
+  f.app.batRotateDegree = 0;
+  const pending = f.app.throwBall();
+  f.center = { x: 170, y: 445 };
+  await f.advance(30);
+  await f.advance(5);
+  f.app.onClickHit();
+  f.center = { x: 170, y: 475 };
+  await f.advance(25);
+  assert.equal(f.app.batRotateDegree, -30);
+  assert.equal(f.app.yBallPosition, 42, '60msの時点では打ち返していない');
+  f.center = { x: 170, y: 505 };
+  await f.advance(30);
+  assert.equal(f.app.batRotateDegree, -60);
+  f.bat = { left: 600, top: 500 };
+  f.center = { x: 170, y: 300 };
+  await f.advance(30);
+  assert.equal(f.app.yBallPosition, 21, '跳ね返って上へ動く');
+  f.center = { x: 170, y: 0 };
+  await f.advance(30);
+  await pending;
+  assert.equal(f.app.point, 4);
+  assert.equal(f.app.strikeCount, 0);
+});
+test('前回の判定は-80度、今回は0度に戻っていても、間に描いた-90度のバットに触れれば打ち返す', async () => {
+  // グリップの62px右のボールは、-80度のバットにはグリップより9.4px以上下で、水平のバットにはグリップの20px上から触れる。
+  // 120msの判定ではグリップの25px上、150msの判定では12px上にある。
+  const f = fixture();
+  f.app.batRotateDegree = 0;
+  const pending = f.app.throwBall();
+  f.center = { x: 170, y: 100 };
+  await f.advance(30);
+  await f.advance(15);
+  f.app.onClickHit();
+  f.center = { x: 170, y: 150 };
+  await f.advance(15);
+  f.center = { x: 170, y: 200 };
+  await f.advance(30);
+  f.center = { x: 170, y: 275 };
+  await f.advance(30);
+  assert.equal(f.app.batRotateDegree, -80);
+  assert.equal(f.app.yBallPosition, 84, '120msの時点では打ち返していない');
+  f.center = { x: 170, y: 288 };
+  await f.advance(30);
+  assert.equal(f.app.batRotateDegree, 0);
+  f.bat = { left: 600, top: 500 };
+  f.center = { x: 170, y: 200 };
+  await f.advance(30);
+  assert.equal(f.app.yBallPosition, 63, '跳ね返って上へ動く');
+  f.center = { x: 170, y: 0 };
+  await f.advance(30);
+  await pending;
+  assert.equal(f.app.point, 4);
+});
+test('水平のバットの上のラインから40pxより下を通るボールは打ち返さず、ストライク', async () => {
+  const f = fixture();
+  f.bat = batAtGameHeight;
+  const pending = f.app.throwBall();
+  f.center = { x: 170, y: 461 };
+  await f.advance(30);
+  f.center = { x: 170, y: 521 };
+  await f.advance(30);
+  await pending;
+  assert.equal(f.app.message, 'ストライク');
+  assert.equal(f.app.strikeCount, 1);
+});
 test('2ストライクでのファールはアウトにしない', async () => {
   const f = fixture();
   f.app.strikeCount = 2;
