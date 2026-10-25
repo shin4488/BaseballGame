@@ -1,53 +1,82 @@
 import Vector2 from '../vector/vector2';
 
 /**
- * 円（ボール）が線分（バット）に当たっているかを判定する。
- * maxAllowedLateHitは、円の中心から線分を延ばした直線までの符号付き距離（始点が左・終点が右の線分では上側が正）の下限。負の値にすると、円の中心が線分より下にある振り遅れも、その距離までは当たりにする。
+ * ボールの中心から、回転したバットの枠までの距離。中心が枠の中にあれば0。
+ * バットは、回転前は幅bat.width・長さbat.lengthの縦長の長方形で、右上の角（グリップ側の端）bat.pivotを中心にdegree度回転させて描く。degreeが負のときは、画面上で反時計回りに回る。
  */
-export const isHitCircleToLine = (
-  lineStartVec2,
-  lineEndVec2,
-  circleCentervec2,
-  circleRadius,
-  maxAllowedLateHit,
+export const getDistanceToBat = (bat, degree, ballCenter) => {
+  const radian = (degree * Math.PI) / 180;
+  const pivotToBall = Vector2.sub(ballCenter, bat.pivot);
+  // 回転を戻した座標では、バットはxが-width〜0、yが0〜lengthの範囲にある。
+  const x = Vector2.dot(
+    pivotToBall,
+    new Vector2(Math.cos(radian), Math.sin(radian)),
+  );
+  const y = Vector2.dot(
+    pivotToBall,
+    new Vector2(-Math.sin(radian), Math.cos(radian)),
+  );
+  return new Vector2(
+    Math.max(-bat.width - x, 0, x),
+    Math.max(-y, 0, y - bat.length),
+  ).magnitude;
+};
+
+/**
+ * ボール（円）が、回転したバットの枠に重なっているかを判定する。
+ */
+export const isBallTouchingBat = (bat, degree, ballCenter, ballRadius) =>
+  // 三角関数の誤差で、ちょうど半径だけ離れたボールを外れにしない。
+  getDistanceToBat(bat, degree, ballCenter) <= ballRadius + 1e-9;
+
+/**
+ * 前回の判定から今回の判定までの間に、ボールがバットに触れたかを判定する。
+ * batFramesは、バットの角度と、その角度を描き始めた時刻（{ time, degree }）を描いた順に並べたもの。先頭は前回の判定、末尾は今回の判定の時点の角度とする。
+ * ボールは、前回の判定の時刻にpreviousBallCenter、今回の判定の時刻にballCenterにあり、その間を一定の速さで動くとみなす。
+ * バットは描いた角度に止まっていて、振る向き（角度が減る向き）に描き替えた瞬間に、間の角度を順に通るとみなす。振り終えて0度に戻るときは、間の角度を通らない。
+ */
+export const isBallHitDuringSwing = (
+  bat,
+  batFrames,
+  previousBallCenter,
+  ballCenter,
+  ballRadius,
 ) => {
-  const lineStartToEnd = Vector2.sub(lineEndVec2, lineStartVec2);
-  const lineStartToCircleCenter = Vector2.sub(circleCentervec2, lineStartVec2);
-  const lineEndToCircleCenter = Vector2.sub(circleCentervec2, lineEndVec2);
+  const startTime = batFrames[0].time;
+  const duration = batFrames[batFrames.length - 1].time - startTime;
+  const ballMove = Vector2.sub(ballCenter, previousBallCenter);
+  const isTouchingAt = (degree, time) => {
+    const ratio =
+      duration > 0
+        ? Math.min(Math.max((time - startTime) / duration, 0), 1)
+        : 1;
+    const center = new Vector2(
+      previousBallCenter.x + ballMove.x * ratio,
+      previousBallCenter.y + ballMove.y * ratio,
+    );
+    return isBallTouchingBat(bat, degree, center, ballRadius);
+  };
 
-  // 円の中心から、線分を延ばした直線までの符号付き距離
-  const minDistanceLineToCircle = Vector2.cross(
-    lineStartToCircleCenter,
-    lineStartToEnd.normarized,
-  );
-
-  if (
-    minDistanceLineToCircle < maxAllowedLateHit ||
-    minDistanceLineToCircle >= circleRadius
-  ) {
-    return false;
+  // ボールが1px、バットが1度（バットの先で約2px）動くごとに調べる。
+  const ballSpeed = duration > 0 ? ballMove.magnitude / duration : 0;
+  for (let index = 0; index < batFrames.length - 1; index++) {
+    const { time, degree } = batFrames[index];
+    const next = batFrames[index + 1];
+    // 次に描き替えるまで、バットは止まり、ボールだけが動く。
+    const ballSteps = Math.max(1, Math.ceil(ballSpeed * (next.time - time)));
+    for (let step = 0; step < ballSteps; step++) {
+      const stepTime = time + ((next.time - time) * step) / ballSteps;
+      if (isTouchingAt(degree, stepTime)) return true;
+    }
+    // 描き替えた瞬間に、バットだけが動く。角度が増える（0度に戻る）ときは調べない。
+    const swingSteps = Math.ceil(degree - next.degree);
+    for (let step = 0; step < swingSteps; step++) {
+      const stepDegree = degree - ((degree - next.degree) * step) / swingSteps;
+      if (isTouchingAt(stepDegree, next.time)) return true;
+    }
   }
-
-  // 円の中心から直線へ下ろした垂線の足が、線分の両端の間にあるか
-  const dotLineStartCircleCenter = Vector2.dot(
-    lineStartToEnd,
-    lineStartToCircleCenter,
-  );
-  const dotLineEndCircleCenter = Vector2.dot(
-    lineStartToEnd,
-    lineEndToCircleCenter,
-  );
-  const isCircleWithinLine =
-    dotLineStartCircleCenter * dotLineEndCircleCenter <= 0;
-
-  // 線分の端点が円の内側にあるか
-  const magnitudeLineStartToCircleCenter = lineStartToCircleCenter.magnitude;
-  const magnitudeLineEndToCircleCenter = lineEndToCircleCenter.magnitude;
-  const isCircleWithinLineEdge =
-    magnitudeLineStartToCircleCenter < circleRadius ||
-    magnitudeLineEndToCircleCenter < circleRadius;
-
-  return isCircleWithinLine || isCircleWithinLineEdge;
+  const last = batFrames[batFrames.length - 1];
+  return isTouchingAt(last.degree, last.time);
 };
 
 /**
@@ -90,9 +119,9 @@ export const getBoardHitTime = (previous, current, radius, board) => {
 };
 
 /**
- * min以上max以下の整数の乱数を返す。引数の順はmax、min。
+ * min以上max以下の整数の乱数を返す。
  */
-export const getRandomNumber = (max, min) => {
+export const getRandomNumber = (min, max) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 

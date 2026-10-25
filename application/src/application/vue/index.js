@@ -2,7 +2,7 @@ import Vector2 from '../vector/vector2';
 import { FirebaseAuthExtention } from '../firebase/auth';
 import { FireStoreExtention, FireStoreColumn } from '../firebase/database';
 import {
-  isHitCircleToLine,
+  isBallHitDuringSwing,
   getBoardHitTime,
   getResultMessage,
   getRandomNumber,
@@ -12,6 +12,8 @@ import 'regenerator-runtime/runtime.js';
 
 export const createVueInstance = () => {
   let guestCreation = null;
+  // 前回のバットとの当たり判定の時点の角度と、その後に描いたバットの角度を、描き始めた時刻とともに描いた順に並べる。判定と判定の間に通った角度をたどるために使う。
+  let batFrames = [];
   return new Vue({
     el: '#app',
     computed: {
@@ -266,12 +268,15 @@ export const createVueInstance = () => {
       onClickHit() {
         // 徐々にバットを振る
         this.batRotateDegree = -this.ratRotateDegreeSpeed;
+        batFrames.push({ time: Date.now(), degree: this.batRotateDegree });
         const swingProcess = setInterval(() => {
           this.batRotateDegree -= this.ratRotateDegreeSpeed;
+          // 同じ処理の中で0度に戻すため、maxBatRotateDegreeの角度は画面に描かれない。
           if (this.batRotateDegree <= this.maxBatRotateDegree) {
             this.batRotateDegree = 0;
             clearInterval(swingProcess);
           }
+          batFrames.push({ time: Date.now(), degree: this.batRotateDegree });
         }, this.batSwingInterval);
       },
       async onClickSaveButton() {
@@ -450,31 +455,44 @@ export const createVueInstance = () => {
         );
         let xBallIncrement = 0;
         let previousBallCenter = null;
+        batFrames = [{ time: Date.now(), degree: this.batRotateDegree }];
 
         await new window.Promise((resolve) => {
           const ballMoveProcess = setInterval(() => {
-            // 回転したバットを囲む矩形の上辺を、バットの線分として扱う。
             const bat = window.document.getElementById('bat');
-            const batPosition = bat.getBoundingClientRect();
-            const batStartVec2 = new Vector2(batPosition.left, batPosition.top);
-            const batEndVec2 = new Vector2(batPosition.right, batPosition.top);
+            // offsetLeft・offsetTopは回転前の配置で、文書の左上からの位置。ゲーム画面はスクロールしないため、getBoundingClientRectで求めるボールの座標と比べられる。
+            const batShape = {
+              pivot: new Vector2(
+                bat.offsetLeft + this.batInitWidth,
+                bat.offsetTop,
+              ),
+              width: this.batInitWidth,
+              length: this.batInitHeight,
+            };
+            const currentBatFrame = {
+              time: Date.now(),
+              degree: this.batRotateDegree,
+            };
+            const swingFrames = [...batFrames, currentBatFrame];
+            batFrames = [currentBatFrame];
             const ball = window.document.getElementById('ball');
             const ballPosition = ball.getBoundingClientRect();
             const ballCenterVec2 = new Vector2(
               ballPosition.left + this.ballRadiusComputed,
               ballPosition.top + this.ballRadiusComputed,
             );
-            // TODO: 振り遅れをどこまで当たりとするか（maxAllowedLateHitに渡す負の値）を決める。
-            const isHitToBat = isHitCircleToLine(
-              batStartVec2,
-              batEndVec2,
-              ballCenterVec2,
-              this.ballRadiusComputed,
-              -this.ballRadiusComputed * 3.5,
-            );
             // 当たった時はボールを跳ね返す
             // 2度打ち防止のため、既にボールが跳ね返っているときはスルー
-            if (isHitToBat && yBallIncrement >= 0) {
+            const isHitToBat =
+              yBallIncrement >= 0 &&
+              isBallHitDuringSwing(
+                batShape,
+                swingFrames,
+                previousBallCenter ?? ballCenterVec2,
+                ballCenterVec2,
+                this.ballRadiusComputed,
+              );
+            if (isHitToBat) {
               yBallIncrement = -yBallIncrement;
               xBallIncrement = getRandomNumber(
                 -this.maxXBallPosition,
