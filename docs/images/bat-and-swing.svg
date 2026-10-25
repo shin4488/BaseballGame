@@ -45,11 +45,12 @@
 <line x1="548" y1="101" x2="557" y2="113" stroke="#7c3aed" stroke-width="1"/>
 <text x="546" y="98" font-size="13" fill="#7c3aed" text-anchor="end" font-weight="bold">グリップ（回転の中心）</text>
 <text x="544" y="334" font-size="13" fill="#111827" text-anchor="middle" font-weight="bold">先端</text>
-<text x="518" y="316" font-size="13" fill="#111827" text-anchor="end" font-weight="normal">0度（構え）</text>
+<text x="518" y="316" font-size="13" fill="#111827" text-anchor="end" font-weight="normal">0°（構え）</text>
 <text x="774" y="141" font-size="13" fill="#111827" text-anchor="start" font-weight="bold">先端</text>
-<text x="774" y="162" font-size="13" fill="#111827" text-anchor="start" font-weight="normal">-90度（水平）</text>
-<text x="755.08" y="78.66" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">-100度（描かない）</text>
+<text x="774" y="162" font-size="13" fill="#111827" text-anchor="start" font-weight="normal">90°（水平）</text>
+<text x="755.08" y="78.66" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">100°（描かない）</text>
 <text x="712.01" y="332.14" font-size="13" fill="#b45309" text-anchor="start" font-weight="bold">先端が動く向き</text>
-<text x="480" y="404" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">「打つ」を押すと-10度を描き、10msごとに10度ずつ描き替える。</text>
-<text x="480" y="424" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">-100度に達したら描かずに0度へ戻す（-90度の次は0度）。</text>
+<text x="480" y="386" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">角度は構えから振った角度。「打つ」を押すとすぐ10°の状態を描き、</text>
+<text x="480" y="406" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">その後10msごとに10°ずつ描き替える。100°に達したら描かずに</text>
+<text x="480" y="426" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">構え（0°）へ戻す（90°の次は0°）。</text>
 </svg>
