@@ -10,7 +10,7 @@
 <rect x="0" y="0" width="900" height="312" rx="12" fill="#ffffff"/>
 <text x="24" y="36" font-size="17" fill="#111827" text-anchor="start" font-weight="bold">判定の時点では外れでも、その間に重なれば当たり</text>
 <rect x="24" y="52" width="14" height="14" rx="3" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb"/>
-<text x="44" y="64" font-size="13" fill="#2563eb" text-anchor="start" font-weight="normal">判定の時点（コードが読む状態）</text>
+<text x="44" y="64" font-size="13" fill="#2563eb" text-anchor="start" font-weight="normal">判定の時点</text>
 <rect x="270" y="52" width="14" height="14" rx="3" fill="#f3f4f6" stroke="#9ca3af"/>
 <text x="290" y="64" font-size="13" fill="#4b5563" text-anchor="start" font-weight="normal">その間に画面に出る状態</text>
 <rect x="24" y="86" width="132" height="206" rx="8" fill="#2563eb" fill-opacity="0.08" stroke="#2563eb" stroke-width="1.5"/>
