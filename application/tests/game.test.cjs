@@ -25,6 +25,7 @@ function load(file) {
 const {
   getResultMessage,
   getRandomNumber,
+  getDistanceToBat,
   isBallTouchingBat,
   isBallHitDuringSwing,
 } = load('src/application/vue/process.js');
@@ -87,6 +88,19 @@ for (const [name, degree, center, expected] of [
       expected,
     ),
   );
+test('バットの枠までの距離は、中心が枠の中なら0、外なら最も近い辺か角までの距離', () => {
+  for (const [center, expected] of [
+    [[62, 10], 0],
+    [[62, 41], 21],
+    [[62, -30], 30],
+    [[134, 34], Math.hypot(14, 14)],
+  ])
+    assert.ok(
+      Math.abs(getDistanceToBat(bat, -90, new Vector2(...center)) - expected) <
+        1e-9,
+      String(center),
+    );
+});
 const frames = (...pairs) => pairs.map(([time, degree]) => ({ time, degree }));
 test('判定と判定の間にバットがボールを通り過ぎたときは当たる', () => {
   // 前回は-30度でグリップの55px下、今回は-60度で85px下。どちらの時点もバットに触れていない。

@@ -1,10 +1,10 @@
 import Vector2 from '../vector/vector2';
 
 /**
- * ボール（円）が、回転したバットに重なっているかを判定する。
+ * ボールの中心から、回転したバットの枠までの距離。中心が枠の中にあれば0。
  * バットは、回転前は幅bat.width・長さbat.lengthの縦長の長方形で、右上の角（グリップ側の端）bat.pivotを中心にdegree度回転させて描く。degreeが負のときは、画面上で反時計回りに回る。
  */
-export const isBallTouchingBat = (bat, degree, ballCenter, ballRadius) => {
+export const getDistanceToBat = (bat, degree, ballCenter) => {
   const radian = (degree * Math.PI) / 180;
   const pivotToBall = Vector2.sub(ballCenter, bat.pivot);
   // 回転を戻した座標では、バットはxが-width〜0、yが0〜lengthの範囲にある。
@@ -16,13 +16,18 @@ export const isBallTouchingBat = (bat, degree, ballCenter, ballRadius) => {
     pivotToBall,
     new Vector2(-Math.sin(radian), Math.cos(radian)),
   );
-  const distanceToBat = new Vector2(
+  return new Vector2(
     Math.max(-bat.width - x, 0, x),
     Math.max(-y, 0, y - bat.length),
   ).magnitude;
-  // 三角関数の誤差で、ちょうど半径だけ離れたボールを外れにしない。
-  return distanceToBat <= ballRadius + 1e-9;
 };
+
+/**
+ * ボール（円）が、回転したバットの枠に重なっているかを判定する。
+ */
+export const isBallTouchingBat = (bat, degree, ballCenter, ballRadius) =>
+  // 三角関数の誤差で、ちょうど半径だけ離れたボールを外れにしない。
+  getDistanceToBat(bat, degree, ballCenter) <= ballRadius + 1e-9;
 
 /**
  * 前回の判定から今回の判定までの間に、ボールがバットに触れたかを判定する。
