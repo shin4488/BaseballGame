@@ -26,11 +26,11 @@
 
 次の図は、この決まりを特定の角度とボールの位置に当てはめた例です。
 
-![バットとボールの大きさと、スイングの軌道](docs/images/bat-and-swing.svg)
+![バットとボールの大きさ、62pxの意味と振った角度ごとに届く範囲、スイングの軌道](docs/images/bat-and-swing.svg)
 
 ![当たりの範囲の例（30°・60°・90°振ったとき）](docs/images/hit-area.svg)
 
-![判定と判定の間にバットがボールを通り過ぎる例](docs/images/hit-between-checks.svg)
+![判定の時点では触れていなくても、その間にバットがボールを通り過ぎたら当たりになる例](docs/images/hit-between-checks.svg)
 
 ## ゲスト番号
 
