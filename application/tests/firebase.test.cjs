@@ -2,12 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const babel = require('@babel/core');
-function load(
-  file,
-  dependencies,
-  browserCrypto = globalThis.crypto,
-  globals = {},
-) {
+// Firestoreが日時のフィールドを保存・返却するときの型。接続はしない。
+const { Timestamp } = require('firebase/firestore');
+function load(file, dependencies, globals = {}) {
   const exports = {};
   const code = babel.transformFileSync(file, {
     presets: [['@babel/preset-env', { modules: 'commonjs' }]],
@@ -18,7 +15,7 @@ function load(
     exports,
     Date,
     Math,
-    window: { Promise, crypto: browserCrypto },
+    window: { Promise },
     ...globals,
     require: (name) => {
       assert.ok(name in dependencies, name);
@@ -27,75 +24,170 @@ function load(
   });
   return exports;
 }
-function database(browserCrypto, initialCounter = 700) {
-  let counterData =
-    initialCounter === null ? null : { lastNumber: initialCounter };
-  let revision = 0;
-  const counterWrites = [],
-    transactionReads = [];
-  const reads = [],
-    writes = [],
-    deletes = [],
-    snapshots = [],
-    counts = [];
+// 現在時刻は2026年10月15日12時（実行環境のタイムゾーン）に固定する。
+const now = new Date(2026, 9, 15, 12, 0);
+class FixedDate extends Date {
+  constructor(...args) {
+    super(...(args.length ? args : [now.getTime()]));
+  }
+  static now() {
+    return now.getTime();
+  }
+}
+const minutesAgo = (minutes) => new Date(now.getTime() - minutes * 60000);
+const sevenDaysAgo = new Date(2026, 9, 8, 12, 0);
+const record = (userId, point, lastUpdated = now) => ({
+  userId,
+  userName: userId,
+  userIconImageUrl: 'icon.png',
+  point,
+  lastUpdated,
+});
+// Firestore Web SDKの保存とクエリを、メモリ内のデータで再現する。
+// 日時はTimestampで保存して返し、orderByに指定したフィールドを持たないドキュメントは結果に含めない。
+function database(
+  initial = {},
+  { randomValues = (bytes) => bytes.fill(171) } = {},
+) {
+  const collections = new Map();
+  const versions = new Map();
+  // 送ったクエリと、返したドキュメントの件数
+  const queries = [];
+  // holdingの間に送ったクエリ。resolveで応答を返す。
+  const held = [];
+  const state = { offline: false, holding: false };
+  let settings = {};
+  const docsOf = (path) => {
+    if (!collections.has(path)) collections.set(path, new Map());
+    return collections.get(path);
+  };
+  const toStored = (value) =>
+    value instanceof Date ? Timestamp.fromDate(value) : value;
+  const touch = (key) => versions.set(key, (versions.get(key) ?? 0) + 1);
+  const write = (ref, data, merge = false) => {
+    const fields = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) {
+        if (!settings.ignoreUndefinedProperties)
+          throw new Error(`Unsupported field value: undefined (${key})`);
+        continue;
+      }
+      fields[key] = toStored(value);
+    }
+    const docs = docsOf(ref.path);
+    docs.set(ref.id, merge ? { ...docs.get(ref.id), ...fields } : fields);
+    touch(`${ref.path}/${ref.id}`);
+  };
+  for (const [path, docs] of Object.entries(initial))
+    for (const [id, data] of Object.entries(docs)) write({ path, id }, data);
+  const online = () => {
+    if (state.offline) throw new Error('unavailable');
+  };
+  const compare = (a, b) => {
+    const rank = (value) =>
+      typeof value === 'number' ? 0 : value instanceof Timestamp ? 1 : 2;
+    return rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0);
+  };
+  const run = (q) => {
+    const orders = q.constraints.filter((c) => c.type === 'orderBy');
+    const cursor = q.constraints.find((c) => c.type === 'startAt');
+    const max = q.constraints.find((c) => c.type === 'limit');
+    const order = (a, b, count = orders.length) => {
+      for (const { field, direction } of orders.slice(0, count)) {
+        const result = compare(a[field], b[field]);
+        if (result) return direction === 'desc' ? -result : result;
+      }
+      return 0;
+    };
+    const idDirection = orders.at(-1)?.direction === 'desc' ? -1 : 1;
+    let rows = [...docsOf(q.path)]
+      .filter(([, data]) => orders.every(({ field }) => field in data))
+      .sort(
+        ([idA, a], [idB, b]) => order(a, b) || compare(idA, idB) * idDirection,
+      );
+    if (cursor) {
+      const position = Object.fromEntries(
+        cursor.values.map((value, i) => [orders[i].field, toStored(value)]),
+      );
+      rows = rows.filter(
+        ([, data]) => order(data, position, cursor.values.length) >= 0,
+      );
+    }
+    if (max) rows = rows.slice(0, max.value);
+    queries.push({ path: q.path, size: rows.length });
+    return {
+      size: rows.length,
+      empty: rows.length === 0,
+      docs: rows.map(([id, data]) => ({ id, data: () => ({ ...data }) })),
+    };
+  };
+  const getDocs = async (q) => {
+    online();
+    if (state.holding)
+      await new Promise((resolve) => held.push({ path: q.path, resolve }));
+    return run(q);
+  };
   const sdk = {
-    initializeFirestore: (_app, options) => {
-      assert.equal(options.ignoreUndefinedProperties, true);
-      return 'database';
+    initializeFirestore: (app, options = {}) => {
+      settings = options;
+      return { app };
     },
-    collection: (db, name) => ({ db, name }),
-    query: (ref, ...constraints) => ({ ...ref, constraints }),
+    collection: (_db, path) => ({ path }),
+    doc: (_db, path, id) => ({ path, id }),
+    query: (ref, ...constraints) => ({ path: ref.path, constraints }),
     orderBy: (field, direction = 'asc') => ({
-      kind: 'order',
+      type: 'orderBy',
       field,
       direction,
     }),
-    startAt: (...values) => ({ kind: 'start', values }),
-    limit: (value) => ({ kind: 'limit', value }),
-    getDocsFromServer: async (query) => sdk.getDocs(query),
-    runTransaction: async (_db, callback) => {
-      // Web SDKの楽観的排他制御を再現し、競合時はコールバックを再実行する。
+    startAt: (...values) => ({ type: 'startAt', values }),
+    limit: (value) => ({ type: 'limit', value }),
+    getDocs,
+    getDocsFromServer: getDocs,
+    getCountFromServer: async (q) => {
+      online();
+      const { size } = run(q);
+      return { data: () => ({ count: size }) };
+    },
+    runTransaction: async (_db, update) => {
+      online();
+      // 読んだドキュメントが確定までに書き換えられていれば、Web SDKと同じくupdateを最初から実行し直す。
       for (let attempt = 0; attempt < 100; attempt++) {
-        const readRevision = revision;
-        const readData = counterData;
-        let pending;
-        const result = await callback({
+        const read = new Map();
+        const pending = [];
+        const result = await update({
           get: async (ref) => {
-            transactionReads.push(ref);
-            return { exists: () => readData !== null, data: () => readData };
+            const key = `${ref.path}/${ref.id}`;
+            read.set(key, versions.get(key) ?? 0);
+            const data = docsOf(ref.path).get(ref.id);
+            return {
+              exists: () => data !== undefined,
+              data: () => data && { ...data },
+            };
           },
           set: (ref, data) => {
-            pending = { ref, data };
+            pending.push([ref, data]);
           },
         });
-        if (readRevision !== revision) continue;
-        if (pending) {
-          counterData = pending.data;
-          revision++;
-          counterWrites.push(pending);
-        }
+        if (
+          [...read].some(
+            ([key, version]) => (versions.get(key) ?? 0) !== version,
+          )
+        )
+          continue;
+        for (const [ref, data] of pending) write(ref, data);
         return result;
       }
       throw new Error('aborted');
     },
-    getCountFromServer: async (query) => {
-      counts.push(query);
-      const next = snapshots.shift();
-      if (next instanceof Error) throw next;
-      return { data: () => ({ count: next.size }) };
-    },
-    getDocs: async (query) => {
-      reads.push(query);
-      const next = snapshots.shift();
-      if (next instanceof Error) throw next;
-      return next;
-    },
-    doc: (db, name, id) => ({ db, name, id }),
     setDoc: async (ref, data, options) => {
-      writes.push({ ref, data, options });
+      online();
+      write(ref, data, options?.merge);
     },
     deleteDoc: async (ref) => {
-      deletes.push(ref);
+      online();
+      docsOf(ref.path).delete(ref.id);
+      touch(`${ref.path}/${ref.id}`);
     },
   };
   const exported = load(
@@ -104,268 +196,308 @@ function database(browserCrypto, initialCounter = 700) {
       'firebase/firestore': sdk,
       'firebase/app': { getApp: () => 'app' },
     },
-    browserCrypto,
+    {
+      Date: FixedDate,
+      window: { Promise, crypto: { getRandomValues: randomValues } },
+    },
   );
+  exported.FireStoreExtention.init();
   return {
     ...exported,
-    sdk,
-    store: new exported.FireStore('database', 'guests'),
-    reads,
-    counts,
-    writes,
-    deletes,
-    snapshots,
-    counterWrites,
-    transactionReads,
-    snapshot: (items) => ({
-      size: items.length,
-      docs: items.map((data) => ({ data: () => data })),
-    }),
+    guests: exported.FireStoreExtention.guestStore,
+    queries,
+    held,
+    state,
+    // 保存されているドキュメントを、IDごとに返す。
+    data: (path) => Object.fromEntries(docsOf(path)),
   };
 }
+const { FireStoreColumn } = database();
 test('ゲスト番号は701、702と連番になり、件数集計や全件取得をしない', async () => {
-  const d = database({ getRandomValues: (bytes) => bytes.fill(171) });
-  const first = await d.store.createUserId();
-  const second = await d.store.createUserId();
+  const d = database({ guests: { _sequence: { lastNumber: 700 } } });
+  const first = await d.guests.createUserId();
+  const second = await d.guests.createUserId();
   assert.equal(first.guestNumberWithPadding, '0000000701');
   assert.equal(second.guestNumberWithPadding, '0000000702');
   assert.equal(first.randomString, 'ab'.repeat(16));
-  assert.equal(d.reads.length + d.counts.length + d.writes.length, 0);
-  assert.equal(d.counterWrites.length, 2);
-  assert.equal(d.counterWrites[0].ref.id, '_sequence');
-  assert.deepEqual(Object.keys(d.counterWrites[0].data), ['lastNumber']);
+  assert.deepEqual(d.queries, []);
+  // カウンターだけを更新し、スコア用のドキュメントは作らない。
+  assert.deepEqual(d.data('guests'), { _sequence: { lastNumber: 702 } });
 });
 
 test('初回は過去の20文字IDの最大番号を1件だけ取得して引き継ぐ', async () => {
-  const d = database(undefined, null);
-  d.snapshots.push(d.snapshot([{ userId: '0000000700abcdefghij' }]));
+  const d = database({
+    guests: {
+      '0000000300abcdefghij': record('0000000300abcdefghij', 5),
+      '0000000700abcdefghij': record('0000000700abcdefghij', 3),
+      '0000000500abcdefghij': record('0000000500abcdefghij', 8),
+    },
+  });
   assert.equal(
-    (await d.store.createUserId()).guestNumberWithPadding,
+    (await d.guests.createUserId()).guestNumberWithPadding,
     '0000000701',
   );
-  await d.store.createUserId();
-  assert.equal(d.reads.length, 1);
-  assert.deepEqual(d.reads[0].constraints, [
-    { kind: 'order', field: 'userId', direction: 'desc' },
-    { kind: 'limit', value: 1 },
-  ]);
+  assert.equal(
+    (await d.guests.createUserId()).guestNumberWithPadding,
+    '0000000702',
+  );
+  assert.deepEqual(d.queries, [{ path: 'guests', size: 1 }]);
 });
 test('データがない場合は1から開始する', async () => {
-  const d = database(undefined, null);
-  d.snapshots.push(d.snapshot([]));
+  const d = database();
   assert.equal(
-    (await d.store.createUserId()).guestNumberWithPadding,
+    (await d.guests.createUserId()).guestNumberWithPadding,
     '0000000001',
   );
 });
 test('保存済みのランダム番号があれば、その最大番号も再利用しない', async () => {
-  const d = database(undefined, null);
-  d.snapshots.push(d.snapshot([{ userId: '0000932456' + 'ab'.repeat(16) }]));
+  const id = '0000932456' + 'ab'.repeat(16);
+  const d = database({ guests: { [id]: record(id, 10) } });
   assert.equal(
-    (await d.store.createUserId()).guestNumberWithPadding,
+    (await d.guests.createUserId()).guestNumberWithPadding,
     '0000932457',
   );
 });
-test('同時に20人が開始しても競合を再試行し、番号が重複しない', async () => {
-  const d = database();
+test('同時に20人が開始しても、番号が重複せず連番になる', async () => {
+  const d = database({ guests: { _sequence: { lastNumber: 700 } } });
   const ids = await Promise.all(
-    Array.from({ length: 20 }, () => d.store.createUserId()),
+    Array.from({ length: 20 }, () => d.guests.createUserId()),
   );
   assert.deepEqual(
     ids.map((id) => Number(id.guestNumberWithPadding)).sort((a, b) => a - b),
     Array.from({ length: 20 }, (_, i) => 701 + i),
   );
-  assert.equal(d.counterWrites.length, 20);
-  assert.ok(d.transactionReads.length > 20, '競合による再試行を通る');
+  assert.deepEqual(d.data('guests')._sequence, { lastNumber: 720 });
 });
 test('初回の同時開始でもカウンターを上書きせず連番を発行する', async () => {
-  const d = database(undefined, null);
-  d.snapshots.push(
-    d.snapshot([{ userId: '0000000700abcdefghij' }]),
-    d.snapshot([{ userId: '0000000700abcdefghij' }]),
-  );
+  const id = '0000000700abcdefghij';
+  const d = database({ guests: { [id]: record(id, 10) } });
   const ids = await Promise.all([
-    d.store.createUserId(),
-    d.store.createUserId(),
+    d.guests.createUserId(),
+    d.guests.createUserId(),
   ]);
   assert.deepEqual(
     ids.map((id) => Number(id.guestNumberWithPadding)).sort(),
     [701, 702],
   );
+  assert.deepEqual(d.data('guests')._sequence, { lastNumber: 702 });
 });
 for (const value of [-1, 1.5, '700', NaN, 9999999999])
   test(`不正または上限のカウンター${value}は更新しない`, async () => {
-    const d = database(undefined, value);
-    await assert.rejects(d.store.createUserId(), {
-      message: 'Create Id Error',
-    });
-    assert.equal(d.counterWrites.length, 0);
+    const d = database({ guests: { _sequence: { lastNumber: value } } });
+    await assert.rejects(d.guests.createUserId());
+    assert.deepEqual(d.data('guests'), { _sequence: { lastNumber: value } });
   });
 test('10桁の最終番号でもIDは42文字を維持する', async () => {
-  const d = database(undefined, 9999999998);
-  const id = await d.store.createUserId();
+  const d = database({ guests: { _sequence: { lastNumber: 9999999998 } } });
+  const id = await d.guests.createUserId();
   assert.match(
     id.guestNumberWithPadding + id.randomString,
     /^9999999999[0-9a-f]{32}$/,
   );
 });
 test('安全な乱数が使えない場合はカウンターも進めない', async () => {
-  const d = database({
-    getRandomValues: () => {
-      throw new Error('unavailable');
+  const d = database(
+    { guests: { _sequence: { lastNumber: 700 } } },
+    {
+      randomValues: () => {
+        throw new Error('unavailable');
+      },
     },
-  });
-  await assert.rejects(d.store.createUserId(), { message: 'Create Id Error' });
-  assert.equal(d.transactionReads.length, 0);
-  assert.equal(d.counterWrites.length, 0);
+  );
+  await assert.rejects(d.guests.createUserId());
+  assert.deepEqual(d.data('guests'), { _sequence: { lastNumber: 700 } });
 });
 test('初回の既存IDが不正な場合は1からやり直さず失敗する', async () => {
-  const d = database(undefined, null);
-  d.snapshots.push(d.snapshot([{ userId: 'broken' }]));
-  await assert.rejects(d.store.createUserId());
-  assert.equal(d.counterWrites.length, 0);
+  const d = database({ guests: { broken: record('broken', 10) } });
+  await assert.rejects(d.guests.createUserId());
+  assert.deepEqual(Object.keys(d.data('guests')), ['broken']);
 });
 
-function guestScreen(store) {
+// 開始画面。ランキングとゲスト番号の取得先を差し替え、ゲームの投球は始めない。
+function screen({ guestStore, rankings = {}, loginUserName = null } = {}) {
   const { createVueInstance } = load(
     'src/application/vue/index.js',
     {
       '../vector/vector2': {},
       '../firebase/auth': {
-        FirebaseAuthExtention: { auth: { signOutFromGoogle: async () => {} } },
+        FirebaseAuthExtention: {
+          auth: {
+            getLoginUserName: () => loginUserName,
+            getLoginUserId: () => null,
+            signOutFromGoogle: async () => {},
+          },
+        },
       },
-      '../firebase/database': { FireStoreExtention: { guestStore: store } },
+      '../firebase/database': {
+        FireStoreExtention: {
+          guestStore,
+          getRankingHistory: async () => [],
+          getRankingThisWeek: async () => [],
+          ...rankings,
+        },
+        FireStoreColumn,
+      },
       './process': {},
       './appConfig': { boardItems: [], guestImagePath: 'guest.png' },
       'regenerator-runtime/runtime.js': {},
     },
-    undefined,
     {
       window: {
-        document: { documentElement: { clientWidth: 1280, clientHeight: 720 } },
+        document: { documentElement: { clientWidth: 390, clientHeight: 844 } },
+        addEventListener: () => {},
       },
       Vue: function (options) {
         return options;
       },
+      setTimeout: () => {},
     },
   );
   const options = createVueInstance();
-  let started = false;
-  return {
-    ...options.data,
-    ...options.methods,
-    executeBaseballGame: () => {
-      started = true;
-    },
-    hasStarted: () => started,
-  };
+  const app = { ...options.data, ...options.methods };
+  return { app, mount: () => options.mounted.call(app) };
 }
+// Firestoreから取得したランキングの1件
+const rankingRow = (point) => ({
+  userId: `guest-${point}`,
+  userName: `ゲスト${point}`,
+  userIconImageUrl: 'guest.png',
+  point,
+  lastUpdated: Timestamp.fromDate(now),
+});
 
 test('画面は連番発行後に42文字のゲストIDを保持してゲームを始める', async () => {
-  const d = database();
-  const screen = guestScreen(d.store);
-  await screen.onClickGuestStart();
-  assert.match(screen.guestUserId, /^\d{10}[0-9a-f]{32}$/);
-  assert.ok(screen.guestNumber >= 1 && screen.guestNumber <= 999999);
-  assert.equal(screen.hasStarted(), true);
-  assert.equal(d.writes.length, 0);
+  const d = database({ guests: { _sequence: { lastNumber: 700 } } });
+  const { app } = screen({ guestStore: d.guests });
+  await app.onClickGuestStart();
+  assert.match(app.guestUserId, /^0000000701[0-9a-f]{32}$/);
+  assert.equal(app.guestNumber, 701);
+  assert.equal(app.isGameOpened, true);
+  assert.deepEqual(Object.keys(d.data('guests')), ['_sequence']);
 });
 
 test('ID生成失敗は画面で通知し、再試行できる', async () => {
   let fail = true;
-  const d = database({
-    getRandomValues: (bytes) => {
-      if (fail) throw new Error('unavailable');
-      return bytes.fill(0);
+  const d = database(
+    {},
+    {
+      randomValues: (bytes) => {
+        if (fail) throw new Error('unavailable');
+        return bytes.fill(0);
+      },
     },
-  });
-  const screen = guestScreen(d.store);
-  await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(), false);
-  assert.equal(screen.guestUserId, null);
-  assert.match(screen.startError, /開始できませんでした/);
-  assert.equal(screen.isStartingGame, false);
+  );
+  const { app } = screen({ guestStore: d.guests });
+  await app.onClickGuestStart();
+  assert.equal(app.isGameOpened, false);
+  assert.equal(app.guestUserId, null);
+  assert.match(app.startError, /開始できませんでした/);
+  assert.equal(app.isStartingGame, false);
   fail = false;
-  await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(), true);
-  assert.equal(screen.startError, '');
+  await app.onClickGuestStart();
+  assert.equal(app.isGameOpened, true);
+  assert.equal(app.startError, '');
 });
 
-test('歴代ランキングは得点降順・日時昇順の上位10件を要求する', async () => {
-  const d = database();
-  const rows = [{ userId: 'first', point: 20 }];
-  d.snapshots.push(d.snapshot(rows));
-  assert.deepEqual(await d.store.getRankingHistory(), rows);
-  assert.equal(d.reads[0].name, 'guests');
-  assert.deepEqual(d.reads[0].constraints, [
-    { kind: 'order', field: 'point', direction: 'desc' },
-    { kind: 'order', field: 'lastUpdated', direction: 'asc' },
-    { kind: 'limit', value: 10 },
-  ]);
+test('歴代ランキングは得点の高い順に上位10件を返し、同点は先に記録した人を上位にする', async () => {
+  const guests = { _sequence: { lastNumber: 12 } };
+  for (const point of [30, 10, 9, 8, 7, 6, 5, 4, 3, 2])
+    guests[`guest-${point}`] = record(`guest-${point}`, point);
+  guests['later-20'] = record('later-20', 20, minutesAgo(1));
+  guests['earlier-20'] = record('earlier-20', 20, minutesAgo(2));
+  const d = database({ guests });
+  const rows = await d.guests.getRankingHistory();
+  assert.deepEqual(
+    rows.map((row) => row.userId),
+    [
+      'guest-30',
+      'earlier-20',
+      'later-20',
+      'guest-10',
+      'guest-9',
+      'guest-8',
+      'guest-7',
+      'guest-6',
+      'guest-5',
+      'guest-4',
+    ],
+  );
+  assert.deepEqual(d.queries, [{ path: 'guests', size: 10 }]);
 });
 test('空の今週ランキングは追加クエリを送らない', async () => {
   const d = database();
-  d.snapshots.push(d.snapshot([]));
-  assert.equal((await d.store.getRankingThisWeek()).length, 0);
-  assert.equal(d.reads.length, 1);
+  assert.equal((await d.guests.getRankingThisWeek()).length, 0);
+  assert.equal(d.queries.length, 1);
 });
 test('今週は7日前から1回だけ取得し、仮登録を除く', async () => {
-  const d = database(),
-    before = Date.now();
-  d.snapshots.push(
-    d.snapshot([{ point: 25 }, { point: 0 }, { point: -1 }, {}]),
-  );
+  const d = database({
+    guests: {
+      _sequence: { lastNumber: 4 },
+      'within-7-days': record(
+        'within-7-days',
+        25,
+        new Date(sevenDaysAgo.getTime() + 60000),
+      ),
+      'zero-point': record('zero-point', 0),
+      provisional: record('provisional', -1),
+      'before-7-days': record(
+        'before-7-days',
+        99,
+        new Date(sevenDaysAgo.getTime() - 60000),
+      ),
+    },
+  });
   assert.deepEqual(
-    (await d.store.getRankingThisWeek()).map((x) => x.point),
-    [25, 0],
+    (await d.guests.getRankingThisWeek()).map((row) => row.userId).sort(),
+    ['within-7-days', 'zero-point'],
   );
-  assert.equal(d.reads.length, 1);
-  const c = d.reads[0].constraints;
-  assert.deepEqual(c.slice(0, 2), [
-    { kind: 'order', field: 'lastUpdated', direction: 'asc' },
-    { kind: 'order', field: 'point', direction: 'desc' },
-  ]);
-  assert.equal(c[2].values.length, 1);
-  assert.ok(
-    Math.abs(c[2].values[0].getTime() - (before - 7 * 86400000)) < 1000,
-  );
+  assert.equal(d.queries.length, 1);
 });
-test('保存は同じIDへマージし、削除は指定IDだけを対象にする', async () => {
-  const d = database();
-  await d.store.upsertRanking({
+test('保存は同じIDの記録を上書きし、削除は指定IDの記録だけを消す', async () => {
+  const d = database({ guests: { 'guest-2': record('guest-2', 5) } });
+  // アイコンを渡さない記録も保存できる。
+  await d.guests.upsertRanking({
     documentId: 'guest-1',
     userName: 'ゲスト1',
     point: 10,
   });
-  assert.deepEqual(d.writes[0].ref, {
-    db: 'database',
-    name: 'guests',
-    id: 'guest-1',
+  await d.guests.upsertRanking({
+    documentId: 'guest-1',
+    userName: 'ゲスト1',
+    point: 3,
   });
-  assert.equal(d.writes[0].options.merge, true);
-  assert.equal(d.writes[0].data.userId, 'guest-1');
-  assert.equal(d.writes[0].data.point, 10);
-  assert.ok(d.writes[0].data.lastUpdated instanceof Date);
-  await d.store.deleteRanking('guest-2');
-  assert.deepEqual(d.deletes, [
-    { db: 'database', name: 'guests', id: 'guest-2' },
-  ]);
+  assert.deepEqual(d.data('guests')['guest-1'], {
+    userId: 'guest-1',
+    userName: 'ゲスト1',
+    point: 3,
+    lastUpdated: Timestamp.fromDate(now),
+  });
+  await d.guests.deleteRanking('guest-2');
+  assert.deepEqual(Object.keys(d.data('guests')), ['guest-1']);
 });
-test('読み取り失敗を、今週と歴代で異なるメッセージで伝える', async () => {
-  for (const [method, message] of [
-    ['getRankingHistory', 'Ranking Fetch Error2'],
-    ['getRankingThisWeek', 'Ranking Fetch Error1'],
-  ]) {
-    const d = database();
-    d.snapshots.push(new Error('offline'));
-    await assert.rejects(d.store[method](), { message });
+test('読み取りに失敗したら、空のランキングにせず失敗を返す', async () => {
+  for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
+    const d = database({ guests: { 'guest-1': record('guest-1', 5) } });
+    d.state.offline = true;
+    await assert.rejects(d.guests[method](), method);
   }
 });
-test('ゲストとログインユーザーの保存先を分離する', () => {
+test('ゲストとログインユーザーの保存先を分離する', async () => {
   const d = database();
-  d.FireStoreExtention.init();
-  assert.equal(d.FireStoreExtention.guestStore._collection, 'guests');
-  assert.equal(d.FireStoreExtention.loginUserStore._collection, 'loginUsers');
+  await d.FireStoreExtention.guestStore.upsertRanking({
+    documentId: 'guest-1',
+    userName: 'ゲスト1',
+    userIconImageUrl: 'guest.png',
+    point: 1,
+  });
+  await d.FireStoreExtention.loginUserStore.upsertRanking({
+    documentId: 'user-1',
+    userName: '山田',
+    userIconImageUrl: 'icon.png',
+    point: 2,
+  });
+  assert.deepEqual(Object.keys(d.data('guests')), ['guest-1']);
+  assert.deepEqual(Object.keys(d.data('loginUsers')), ['user-1']);
 });
 function auth() {
   let listener;
@@ -421,99 +553,68 @@ test('Google認証のID・表示名・アイコンとログアウトを維持す
 });
 test('Google認証のキャンセルを成功扱いしない', async () => {
   const a = auth();
+  const ready = a.handler.watchStateChanged();
+  a.notify(null);
+  await ready;
   a.sdk.signInWithPopup = async () => {
     throw new Error('cancelled');
   };
-  await assert.rejects(a.handler.signInWithPopupToGoogle(), {
-    message: 'cancelled',
-  });
+  await assert.rejects(a.handler.signInWithPopupToGoogle());
+  assert.equal(a.handler.isLoggedIn(), false);
 });
 
 for (const method of ['getRankingHistory', 'getRankingThisWeek']) {
-  test(`${method}は両コレクションを同時取得し、得点・日時順の上位10件を返す`, async () => {
-    const d = database();
-    let finishGuests, finishUsers;
-    d.FireStoreExtention.guestStore = {
-      [method]: () =>
-        new Promise((r) => {
-          finishGuests = r;
-        }),
-    };
-    d.FireStoreExtention.loginUserStore = {
-      [method]: () =>
-        new Promise((r) => {
-          finishUsers = r;
-        }),
-    };
+  test(`${method}は両コレクションへ同時に問い合わせ、得点・日時順の上位10件を返す`, async () => {
+    const guests = {};
+    for (let point = 0; point < 10; point++)
+      guests[`guest-${point}`] = record(`guest-${point}`, point);
+    const d = database({
+      guests,
+      loginUsers: {
+        'user-9': record('user-9', 9, minutesAgo(60)),
+        'user-20': record('user-20', 20, minutesAgo(60)),
+      },
+    });
+    d.state.holding = true;
     const pending = d.FireStoreExtention[method]();
-    assert.equal(typeof finishGuests, 'function');
-    assert.equal(typeof finishUsers, 'function');
-    finishGuests(
-      Array.from({ length: 10 }, (_, i) => ({
-        point: i,
-        lastUpdated: new Date(1000),
-      })),
-    );
-    finishUsers([
-      { point: 9, lastUpdated: new Date(0) },
-      { point: 20, lastUpdated: new Date(0) },
+    assert.deepEqual(d.held.map((q) => q.path).sort(), [
+      'guests',
+      'loginUsers',
     ]);
-    const result = await pending;
-    assert.equal(result.length, 10);
-    assert.equal(result[0].point, 20);
-    assert.equal(result[1].point, 9);
-    assert.equal(result[1].lastUpdated.getTime(), 0);
-    assert.equal(result[2].lastUpdated.getTime(), 1000);
+    for (const q of d.held) q.resolve();
+    assert.deepEqual(
+      [...(await pending)].map((row) => row.userId),
+      [
+        'user-20',
+        'user-9',
+        'guest-9',
+        'guest-8',
+        'guest-7',
+        'guest-6',
+        'guest-5',
+        'guest-4',
+        'guest-3',
+        'guest-2',
+      ],
+    );
   });
 }
 
-function rankingScreen(sources, loginUserName = null) {
-  const { createVueInstance } = load(
-    'src/application/vue/index.js',
-    {
-      '../vector/vector2': {},
-      '../firebase/auth': {
-        FirebaseAuthExtention: {
-          auth: { getLoginUserName: () => loginUserName },
-        },
-      },
-      '../firebase/database': { FireStoreExtention: sources },
-      './process': {},
-      './appConfig': { boardItems: [] },
-      'regenerator-runtime/runtime.js': {},
-    },
-    undefined,
-    {
-      window: {
-        document: { documentElement: { clientWidth: 390, clientHeight: 844 } },
-        addEventListener: () => {},
-      },
-      Vue: function (options) {
-        return options;
-      },
-    },
-  );
-  const options = createVueInstance();
-  const app = {
-    ...options.data,
-    ...options.methods,
-    mapFirestoreToRankingTable: async (rows) => rows,
-  };
-  return { app, options };
-}
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 test('番号と週間ランキングが取得中でも歴代を表示し、番号が届けば開始画面に保持する', async () => {
   let finishHistory, finishWeek, finishGuest;
-  const { app, options } = rankingScreen({
-    getRankingHistory: () =>
-      new Promise((r) => {
-        finishHistory = r;
-      }),
-    getRankingThisWeek: () =>
-      new Promise((r) => {
-        finishWeek = r;
-      }),
+  const { app, mount } = screen({
+    rankings: {
+      getRankingHistory: () =>
+        new Promise((r) => {
+          finishHistory = r;
+        }),
+      getRankingThisWeek: () =>
+        new Promise((r) => {
+          finishWeek = r;
+        }),
+    },
     guestStore: {
       createUserId: () =>
         new Promise((r) => {
@@ -521,7 +622,7 @@ test('番号と週間ランキングが取得中でも歴代を表示し、番�
         }),
     },
   });
-  options.mounted.call(app);
+  mount();
   assert.equal(app.shouldShowInitImage, false);
   assert.equal(app.guestUserId, null);
   assert.equal(app.isPreparingGuest, true);
@@ -533,7 +634,7 @@ test('番号と週間ランキングが取得中でも歴代を表示し、番�
   assert.equal(app.guestNumber, 701);
   assert.equal(app.isPreparingGuest, false);
   assert.equal(typeof finishWeek, 'function');
-  finishHistory([{ point: 21 }]);
+  finishHistory([rankingRow(21)]);
   await flush();
   assert.equal(app.rankings.history.dataList[0].point, 21);
   assert.equal(app.rankings.history.isLoading, false);
@@ -545,11 +646,13 @@ test('番号と週間ランキングが取得中でも歴代を表示し、番�
 
 test('片方の取得失敗でも他方を表示し、再取得できる', async () => {
   let fail = true;
-  const { app } = rankingScreen({
-    getRankingHistory: async () => [{ point: 12 }],
-    getRankingThisWeek: async () => {
-      if (fail) throw new Error('offline');
-      return [{ point: 7 }];
+  const { app } = screen({
+    rankings: {
+      getRankingHistory: async () => [rankingRow(12)],
+      getRankingThisWeek: async () => {
+        if (fail) throw new Error('offline');
+        return [rankingRow(7)];
+      },
     },
   });
   await app.initializeTopMenuData();
@@ -564,15 +667,16 @@ test('片方の取得失敗でも他方を表示し、再取得できる', async
 
 test('古い応答で新しいランキングを上書きしない', async () => {
   const pending = [];
-  const { app } = rankingScreen({
-    getRankingHistory: () => new Promise((r) => pending.push(r)),
-    getRankingThisWeek: async () => [],
+  const { app } = screen({
+    rankings: {
+      getRankingHistory: () => new Promise((r) => pending.push(r)),
+    },
   });
   const old = app.initializeTopMenuData();
   const current = app.initializeTopMenuData();
-  pending[1]([{ point: 20 }]);
+  pending[1]([rankingRow(20)]);
   await current;
-  pending[0]([{ point: 1 }]);
+  pending[0]([rankingRow(1)]);
   await old;
   assert.equal(app.rankings.history.dataList[0].point, 20);
 });
@@ -580,89 +684,89 @@ test('古い応答で新しいランキングを上書きしない', async () =>
 test('ゲスト開始を連打してもID発行は1回、発行後に開始する', async () => {
   let count = 0,
     finish;
-  const screen = guestScreen({
-    createUserId: () => {
-      count++;
-      return new Promise((r) => {
-        finish = r;
-      });
+  const { app } = screen({
+    guestStore: {
+      createUserId: () => {
+        count++;
+        return new Promise((r) => {
+          finish = r;
+        });
+      },
     },
   });
-  const first = screen.onClickGuestStart();
+  const first = app.onClickGuestStart();
   await flush();
-  await screen.onClickGuestStart();
+  await app.onClickGuestStart();
   assert.equal(count, 1);
-  assert.equal(screen.hasStarted(), false);
+  assert.equal(app.isGameOpened, false);
   finish({
     guestNumberWithPadding: '0000000007',
     randomString: 'ab'.repeat(16),
   });
   await first;
-  assert.equal(screen.hasStarted(), true);
-  assert.equal(screen.guestNumber, 7);
-  assert.equal(screen.isStartingGame, false);
+  assert.equal(app.isGameOpened, true);
+  assert.equal(app.guestNumber, 7);
+  assert.equal(app.isStartingGame, false);
 });
 
 test('発番通信に失敗した場合はランダム番号で開始せず、再試行できる', async () => {
-  const d = database();
-  const transaction = d.sdk.runTransaction;
-  d.sdk.runTransaction = async () => {
-    throw new Error('resource-exhausted');
-  };
-  const screen = guestScreen(d.store);
-  await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(), false);
-  assert.equal(screen.guestUserId, null);
-  assert.match(screen.startError, /開始できませんでした/);
-  assert.equal(d.counterWrites.length, 0);
-  d.sdk.runTransaction = transaction;
-  await screen.onClickGuestStart();
-  assert.equal(screen.hasStarted(), true);
-  assert.equal(screen.guestNumber, 701);
-  assert.equal(screen.startError, '');
+  const d = database({ guests: { _sequence: { lastNumber: 700 } } });
+  const { app } = screen({ guestStore: d.guests });
+  d.state.offline = true;
+  await app.onClickGuestStart();
+  assert.equal(app.isGameOpened, false);
+  assert.equal(app.guestUserId, null);
+  assert.equal(app.guestNumber, null);
+  assert.match(app.startError, /開始できませんでした/);
+  assert.deepEqual(d.data('guests'), { _sequence: { lastNumber: 700 } });
+  d.state.offline = false;
+  await app.onClickGuestStart();
+  assert.equal(app.isGameOpened, true);
+  assert.equal(app.guestNumber, 701);
+  assert.equal(app.startError, '');
 });
 test('同じゲストで再度開始する場合は番号を再発行しない', async () => {
-  const d = database();
-  const screen = guestScreen(d.store);
-  await screen.onClickGuestStart();
-  const first = screen.guestUserId;
-  await screen.onClickGuestStart();
-  assert.equal(screen.guestUserId, first);
-  assert.equal(d.counterWrites.length, 1);
+  const d = database({ guests: { _sequence: { lastNumber: 700 } } });
+  const { app } = screen({ guestStore: d.guests });
+  await app.onClickGuestStart();
+  const first = app.guestUserId;
+  await app.onClickGuestStart();
+  assert.equal(app.guestUserId, first);
+  assert.deepEqual(d.data('guests'), { _sequence: { lastNumber: 701 } });
 });
 
 test('開始画面の発番中に開始を押しても番号を二重発行しない', async () => {
   let calls = 0,
     finish;
-  const screen = guestScreen({
-    createUserId: () => {
-      calls++;
-      return new Promise((resolve) => {
-        finish = resolve;
-      });
+  const { app, mount } = screen({
+    guestStore: {
+      createUserId: () => {
+        calls++;
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      },
     },
   });
-  const preparation = screen.createGuestUser();
-  const start = screen.onClickGuestStart();
+  mount();
+  const start = app.onClickGuestStart();
   await flush();
   assert.equal(calls, 1);
-  assert.equal(screen.hasStarted(), false);
+  assert.equal(app.isGameOpened, false);
   finish({
     guestNumberWithPadding: '0000000701',
     randomString: 'ab'.repeat(16),
   });
-  await Promise.all([preparation, start]);
-  assert.equal(screen.guestNumber, 701);
-  assert.equal(screen.hasStarted(), true);
-  await screen.onClickGuestStart();
+  await start;
+  assert.equal(app.guestNumber, 701);
+  assert.equal(app.isGameOpened, true);
+  await app.onClickGuestStart();
   assert.equal(calls, 1);
 });
 
-test('初回発番の失敗は画面に表示し、取得処理をやり直せる', async () => {
+test('画面表示時の発番に失敗したら画面に表示し、「ゲストとして開始」で再試行できる', async () => {
   let fail = true;
-  const { app, options } = rankingScreen({
-    getRankingHistory: async () => [],
-    getRankingThisWeek: async () => [],
+  const { app, mount } = screen({
     guestStore: {
       createUserId: async () => {
         if (fail) throw new Error('offline');
@@ -673,31 +777,28 @@ test('初回発番の失敗は画面に表示し、取得処理をやり直せ�
       },
     },
   });
-  options.mounted.call(app);
+  mount();
   await flush();
   assert.match(app.startError, /ゲスト番号を取得できませんでした/);
   assert.equal(app.isPreparingGuest, false);
   assert.equal(app.guestUserId, null);
   fail = false;
-  await app.createGuestUser();
+  await app.onClickGuestStart();
   assert.equal(app.guestNumber, 701);
+  assert.equal(app.isGameOpened, true);
 });
 
 test('ログイン済みの開始画面ではゲスト番号を発行しない', async () => {
   let calls = 0;
-  const { app, options } = rankingScreen(
-    {
-      getRankingHistory: async () => [],
-      getRankingThisWeek: async () => [],
-      guestStore: {
-        createUserId: async () => {
-          calls++;
-        },
+  const { app, mount } = screen({
+    guestStore: {
+      createUserId: async () => {
+        calls++;
       },
     },
-    '山田',
-  );
-  options.mounted.call(app);
+    loginUserName: '山田',
+  });
+  mount();
   await flush();
   assert.equal(app.loginUserName, '山田');
   assert.equal(calls, 0);
