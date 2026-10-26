@@ -38,9 +38,11 @@ const rect = (left, top, width, height) => ({
   x: left,
   y: top,
 });
+// 既定のMath.randomの値。投球の速さは10〜30pxのうち21pxになる。
+const defaultRandom = 0.55;
 function fixture(
   boards = [{ left: 100, point: 4, out: 0 }],
-  { width = 800, height = 600, random } = {},
+  { width = 800, height = 600, random = defaultRandom } = {},
 ) {
   let now = 0,
     nextId = 0;
@@ -75,28 +77,28 @@ function fixture(
               rect(f.center.x - 20, f.center.y - 20, 40, 40),
           },
   };
+  const math = Object.create(Math, { random: { value: () => random } });
   const mod = load(
     'src/application/vue/index.js',
     {
       '../vector/vector2': vector,
-      '../firebase/auth': {},
+      '../firebase/auth': {
+        FirebaseAuthExtention: {
+          auth: { isLoggedIn: () => true, getLoginUserName: () => '山田' },
+        },
+      },
       '../firebase/database': {},
-      // randomを指定したときは、Math.randomだけを固定した実際の乱数関数を使う。
-      './process':
-        random === undefined
-          ? { ...processModule, getRandomNumber: () => 21 }
-          : load(
-              'src/application/vue/process.js',
-              { '../vector/vector2': vector },
-              {
-                Math: Object.create(Math, { random: { value: () => random } }),
-              },
-            ),
+      './process': load(
+        'src/application/vue/process.js',
+        { '../vector/vector2': vector },
+        { Math: math },
+      ),
       './appConfig': { boardItems: [] },
       'regenerator-runtime/runtime.js': {},
     },
     {
       window: { document: doc, Promise },
+      Math: math,
       Date: { now: () => now },
       Vue: function (o) {
         return o;
@@ -130,77 +132,92 @@ function fixture(
     }
     now = end;
   };
-  f.timers = timers;
+  // ログイン済みのプレイヤーとして開始し、4秒後に1球目を投げ始めるまで進める。
+  f.startFirstPitch = async () => {
+    f.app.onClickLogin();
+    await f.advance(4000);
+  };
   return f;
 }
-async function hitPath(centers, boards, initialOut = 0) {
-  const f = fixture(boards);
-  f.app.outCount = initialOut;
-  const pending = f.app.throwBall();
-  await f.advance(30); // バットで打ち返す。
-  f.bat = { left: 600, top: 500 };
+// バットに触れず、下端がストライクの判定線（画面の下端から60px上）を越える位置
+const strikeZone = { x: 170, y: 550 };
+// 的・画面の端・ストライクの判定線に届かず、投球が続く位置
+const inFlight = { x: 170, y: 200 };
+// 投げ始めた直後の判定で水平のバットに当てて打ち返し、その後の判定ごとにボールの中心をcentersの順に動かす。
+async function hitAndMove(f, centers) {
+  f.center = { x: 170, y: 300 };
+  await f.advance(30);
   for (const center of centers) {
     f.center = center;
     await f.advance(30);
   }
-  assert.equal(f.timers.size, 0, '1球が終了し、移動タイマーが残らない');
-  await pending;
+}
+// 開始してから4秒ごとに投げる球を、pitchesの打球の軌道で順に打ち返し、次の球を投げ始めるまで進める。
+// 1球の結果が決まった後もボールが判定され続けると、上端にあるボールがアウトになり、得点・アウト数が変わる。
+async function play(pitches, boards) {
+  const f = fixture(boards);
+  await f.startFirstPitch();
+  for (const centers of pitches) {
+    await hitAndMove(f, centers);
+    await f.advance(4000 - 30 * (centers.length + 1));
+  }
   return f.app;
 }
+const throughBoardCenter = [
+  { x: 170, y: 50 },
+  { x: 170, y: 30 },
+  { x: 170, y: 0 },
+];
+const throughGap = [
+  { x: 350, y: 100 },
+  { x: 350, y: 40 },
+  { x: 350, y: 0 },
+];
 test('満塁ホームランの中央を通る高速打球をアウトにしない', async () => {
-  const app = await hitPath([83, 62, 41, 20].map((y) => ({ x: 170, y })));
+  const app = await play([[83, 62, 41, 20].map((y) => ({ x: 170, y }))]);
   assert.equal(app.point, 4);
   assert.equal(app.outCount, 0);
 });
 test('フレーム間に的を完全に通過しても得点する', async () => {
-  const app = await hitPath([
-    { x: 170, y: 90 },
-    { x: 170, y: 0 },
+  const app = await play([
+    [
+      { x: 170, y: 90 },
+      { x: 170, y: 0 },
+    ],
   ]);
   assert.equal(app.point, 4);
   assert.equal(app.outCount, 0);
 });
 for (const point of [1, 2, 3, 4])
   test(`${point}点の的への命中でその点だけ加算する`, async () => {
-    const app = await hitPath(
-      [
-        { x: 170, y: 50 },
-        { x: 170, y: 30 },
-        { x: 170, y: 0 },
-      ],
+    const app = await play(
+      [throughBoardCenter],
       [{ left: 100, point, out: 0 }],
     );
     assert.equal(app.point, point);
     assert.equal(app.outCount, 0);
   });
 for (const out of [1, 2, 3])
-  test(`${out}アウトの的は得点せず、アウト数を3で止める`, async () => {
-    const app = await hitPath(
-      [
-        { x: 170, y: 50 },
-        { x: 170, y: 30 },
-        { x: 170, y: 0 },
-      ],
+  test(`1アウトから${out}アウトの的に当てると得点せず、アウト数を3で止める`, async () => {
+    const app = await play(
+      [throughGap, throughBoardCenter],
       [{ left: 100, point: 0, out }],
-      1,
     );
     assert.equal(app.point, 0);
     assert.equal(app.outCount, Math.min(3, 1 + out));
   });
 test('的の隙間を抜ける打球はアウト', async () => {
-  const app = await hitPath([
-    { x: 350, y: 100 },
-    { x: 350, y: 40 },
-    { x: 350, y: 0 },
-  ]);
+  const app = await play([throughGap]);
   assert.equal(app.point, 0);
   assert.equal(app.outCount, 1);
 });
 test('隣接した的ではDOMの順序でなく先に触れた的を採用する', async () => {
-  const app = await hitPath(
+  const app = await play(
     [
-      { x: 330, y: 90 },
-      { x: 180, y: 0 },
+      [
+        { x: 330, y: 90 },
+        { x: 180, y: 0 },
+      ],
     ],
     [
       { left: 100, point: 0, out: 1 },
@@ -212,61 +229,51 @@ test('隣接した的ではDOMの順序でなく先に触れた的を採用す�
 });
 test('投球が長引いても重複せず、結果表示時間を確保する', async () => {
   const f = fixture();
-  let pitches = 0,
-    finish;
-  f.app.throwBall = () => {
-    pitches++;
-    return new Promise((resolve) => {
-      finish = resolve;
-    });
-  };
-  f.app.clearThrowingBall = () => {};
-  f.app.executeBaseballGame();
-  await f.advance(4000);
-  assert.equal(pitches, 1);
-  await f.advance(8000);
-  assert.equal(pitches, 1);
-  finish();
-  await f.advance(0);
-  for (let i = 0; i < 12; i++) await Promise.resolve();
-  await f.advance(1499);
-  assert.equal(pitches, 1);
+  f.bat = { left: 600, top: 500 };
+  f.center = inFlight;
+  await f.startFirstPitch();
+  await f.advance(9000);
+  assert.equal(f.app.strikeCount, 0, '9秒間、1球目の投球が続く');
+  f.center = strikeZone;
+  await f.advance(30);
+  assert.equal(f.app.strikeCount, 1, '投げている球は1球だけ');
+  // 2球目は、1球目の結果から1500ms後に投げ始め、その30ms後の判定でストライクになる。
+  await f.advance(1529);
+  assert.equal(f.app.strikeCount, 1);
   await f.advance(1);
-  assert.equal(pitches, 2);
+  assert.equal(f.app.strikeCount, 2);
 });
 test('開始の重複呼び出しで複数のゲームを起動しない', async () => {
   const f = fixture();
-  let pitches = 0;
-  f.app.throwBall = () => {
-    pitches++;
-    return new Promise(() => {});
-  };
-  f.app.executeBaseballGame();
-  f.app.executeBaseballGame();
-  await f.advance(4000);
-  assert.equal(pitches, 1);
+  f.center = strikeZone;
+  f.app.onClickLogin();
+  f.app.onClickLogin();
+  await f.advance(4030);
+  assert.equal(f.app.strikeCount, 1, '1球だけを判定する');
 });
 test('3アウト後に追加投球せず結果を表示し、リトライは0から1試合だけ開始する', async () => {
-  const f = fixture();
-  let pitches = 0;
-  f.app.throwBall = async () => {
-    pitches++;
-    f.app.outCount = 3;
-    f.app.point = 4;
-  };
-  f.app.clearThrowingBall = () => {};
-  f.app.executeBaseballGame();
+  const f = fixture([{ left: 100, point: 4, out: 0 }]);
+  await f.startFirstPitch();
+  await hitAndMove(f, [{ x: 170, y: 0 }]);
+  // 的は投げ始めるときの表示から選ぶため、2球目を投げ始める前に入れ替える。
+  f.boards = [{ left: 100, point: 0, out: 3 }];
+  await f.advance(4000 - 60);
+  await hitAndMove(f, [{ x: 170, y: 0 }]);
+  assert.equal(f.app.outCount, 3);
+  // 追加の投球があれば、上端にあるボールがアウトになる。
   await f.advance(10000);
-  assert.equal(pitches, 1);
+  assert.equal(f.app.point, 4);
+  assert.equal(f.app.outCount, 3);
+  assert.equal(f.app.message, 'ゲームセット');
   assert.equal(f.app.shouldShowResult, true);
   assert.equal(f.app.isGameOpened, false);
-  assert.equal(f.timers.size, 0);
   f.app.onClickRetryButton();
   assert.equal(f.app.point, 0);
   assert.equal(f.app.outCount, 0);
   assert.equal(f.app.strikeCount, 0);
-  await f.advance(4000);
-  assert.equal(pitches, 2);
+  f.center = strikeZone;
+  await f.advance(4030);
+  assert.equal(f.app.strikeCount, 1, '1試合分の1球だけを判定する');
 });
 
 for (const [random, speed, xSpeed] of [
@@ -275,15 +282,12 @@ for (const [random, speed, xSpeed] of [
 ])
   test(`乱数が${random}のとき、投球は${speed}px、打球の横方向は${xSpeed}pxずつ動く`, async () => {
     const f = fixture(undefined, { random });
-    const pending = f.app.throwBall();
+    await f.startFirstPitch();
     await f.advance(30); // バットで打ち返す。
     f.bat = { left: 600, top: 500 };
     await f.advance(30);
     assert.equal(f.app.yBallPosition, -speed);
     assert.equal(f.app.xBallPosition, xSpeed);
-    f.center = { x: 170, y: 0 };
-    await f.advance(30);
-    await pending;
   });
 test('速度10〜30pxと各開始位置の420通りで、的の中央への命中を取りこぼさない', async () => {
   let cases = 0;
@@ -292,7 +296,7 @@ test('速度10〜30pxと各開始位置の420通りで、的の中央への命�
       const centers = [];
       for (let y = 70 + phase; y >= -30; y -= speed)
         centers.push({ x: 170, y });
-      const app = await hitPath(centers);
+      const app = await play([centers]);
       assert.equal(app.point, 4, `speed=${speed}, phase=${phase}`);
       assert.equal(app.outCount, 0);
       cases++;
@@ -315,28 +319,33 @@ for (const [name, previous, current, expected] of [
     if (expected === null) assert.equal(actual, null);
     else assert.ok(Math.abs(actual - expected) < 1e-10);
   });
-for (const strikes of [0, 1, 2])
-  test(`空振りはストライク${strikes}から規定どおり増える`, async () => {
+for (const [strikes, message, expectedStrikes, expectedOuts] of [
+  [0, 'ストライク', 1, 0],
+  [1, 'ストライク', 2, 0],
+  [2, '三振', 0, 1],
+])
+  test(`${strikes}ストライクからの見逃しは「${message}」で、ストライク${expectedStrikes}・アウト${expectedOuts}になる`, async () => {
     const f = fixture();
-    f.bat = { left: 600, top: 500 };
-    f.app.strikeCount = strikes;
-    const pending = f.app.throwBall();
-    f.center = { x: 170, y: 550 };
+    f.center = strikeZone;
+    f.app.onClickLogin();
+    // 4秒ごとに投げる球を、strikes球続けて見逃し、次の球を投げ始めるまで進める。
+    await f.advance(4000 * (strikes + 1));
+    assert.equal(f.app.strikeCount, strikes);
     await f.advance(30);
-    await pending;
-    assert.equal(f.app.strikeCount, strikes === 2 ? 0 : strikes + 1);
-    assert.equal(f.app.outCount, strikes === 2 ? 1 : 0);
+    assert.equal(f.app.message, message);
+    assert.equal(f.app.strikeCount, expectedStrikes);
+    assert.equal(f.app.outCount, expectedOuts);
     assert.equal(f.app.point, 0);
   });
 // グリップ側の端が(108, 420)のバット。ゲームと同じく、ボールの中心がグリップの100px下を過ぎるとストライクになる。
 const batAtGameHeight = { left: 88, top: 420 };
 test('判定と判定の間にバットがボールを通り過ぎても、打ち返す', async () => {
-  // 60msの判定は-30度でグリップの55px下、90msの判定は-60度で85px下。どちらの時点もバットに触れていない。
+  // 1球目を投げ始めてから60msの判定は-30度でグリップの55px下、90msの判定は-60度で85px下。どちらの時点もバットに触れていない。
   const f = fixture();
   f.bat = batAtGameHeight;
   f.app.batRotateDegree = 0;
-  const pending = f.app.throwBall();
   f.center = { x: 170, y: 445 };
+  await f.startFirstPitch();
   await f.advance(30);
   await f.advance(5);
   f.app.onClickHit();
@@ -353,17 +362,16 @@ test('判定と判定の間にバットがボールを通り過ぎても、打�
   assert.equal(f.app.yBallPosition, 21, '跳ね返って上へ動く');
   f.center = { x: 170, y: 0 };
   await f.advance(30);
-  await pending;
   assert.equal(f.app.point, 4);
   assert.equal(f.app.strikeCount, 0);
 });
 test('前回の判定は-80度、今回は0度に戻っていても、間に描いた-90度のバットに触れれば打ち返す', async () => {
   // グリップの62px右のボールは、-80度のバットにはグリップより9.4px以上下で、水平のバットにはグリップの20px上から触れる。
-  // 120msの判定ではグリップの25px上、150msの判定では12px上にある。
+  // 1球目を投げ始めてから120msの判定ではグリップの25px上、150msの判定では12px上にある。
   const f = fixture();
   f.app.batRotateDegree = 0;
-  const pending = f.app.throwBall();
   f.center = { x: 170, y: 100 };
+  await f.startFirstPitch();
   await f.advance(30);
   await f.advance(15);
   f.app.onClickHit();
@@ -384,45 +392,42 @@ test('前回の判定は-80度、今回は0度に戻っていても、間に描�
   assert.equal(f.app.yBallPosition, 63, '跳ね返って上へ動く');
   f.center = { x: 170, y: 0 };
   await f.advance(30);
-  await pending;
   assert.equal(f.app.point, 4);
 });
 test('水平のバットの上のラインから40pxより下を通るボールは打ち返さず、ストライク', async () => {
   const f = fixture();
   f.bat = batAtGameHeight;
-  const pending = f.app.throwBall();
   f.center = { x: 170, y: 461 };
+  await f.startFirstPitch();
   await f.advance(30);
   f.center = { x: 170, y: 521 };
   await f.advance(30);
-  await pending;
   assert.equal(f.app.message, 'ストライク');
   assert.equal(f.app.strikeCount, 1);
 });
 test('2ストライクでのファールはアウトにしない', async () => {
   const f = fixture();
-  f.app.strikeCount = 2;
-  const pending = f.app.throwBall();
-  await f.advance(30);
-  f.center = { x: 5, y: 300 };
-  await f.advance(30);
-  await pending;
+  f.center = strikeZone;
+  f.app.onClickLogin();
+  // 2球続けて見逃し、3球目を投げ始めるまで進める。
+  await f.advance(12000);
+  assert.equal(f.app.strikeCount, 2);
+  await hitAndMove(f, [{ x: 5, y: 300 }]);
   assert.equal(f.app.strikeCount, 2);
   assert.equal(f.app.outCount, 0);
   assert.equal(f.app.message, 'ファール');
 });
 test('短い投球では4秒間隔で次の球を投げる', async () => {
   const f = fixture();
-  let pitches = 0;
-  f.app.throwBall = async () => {
-    pitches++;
-  };
-  f.app.clearThrowingBall = () => {};
-  f.app.executeBaseballGame();
-  await f.advance(4000);
-  assert.equal(pitches, 1);
-  await f.advance(3999);
-  assert.equal(pitches, 1);
+  f.center = strikeZone;
+  f.app.onClickLogin();
+  // 開始から4秒後に1球目を投げ始め、その30ms後の判定でストライクになる。
+  await f.advance(4029);
+  assert.equal(f.app.strikeCount, 0);
   await f.advance(1);
-  assert.equal(pitches, 2);
+  assert.equal(f.app.strikeCount, 1);
+  await f.advance(3999);
+  assert.equal(f.app.strikeCount, 1);
+  await f.advance(1);
+  assert.equal(f.app.strikeCount, 2);
 });

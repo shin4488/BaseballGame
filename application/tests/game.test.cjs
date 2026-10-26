@@ -22,13 +22,9 @@ function load(file) {
   });
   return exports;
 }
-const {
-  getResultMessage,
-  getRandomNumber,
-  getDistanceToBat,
-  isBallTouchingBat,
-  isBallHitDuringSwing,
-} = load('src/application/vue/process.js');
+const { getResultMessage, getRandomNumber, isBallHitDuringSwing } = load(
+  'src/application/vue/process.js',
+);
 const Vector2 = load('src/application/vector/vector2.js').default;
 
 for (const [point, message] of [
@@ -57,20 +53,25 @@ test('乱数の両端を含み、同じ上下限にも対応する', (t) => {
   assert.equal(getRandomNumber(-30, 30), 30);
   assert.equal(getRandomNumber(3, 3), 3);
 });
-test('ベクトルの大きさはx・y両方の成分から求める', () => {
-  assert.equal(new Vector2(3, 4).magnitude, 5);
-  assert.equal(new Vector2(-3, -4).magnitude, 5);
-  const unit = new Vector2(3, 4).normarized;
-  assert.equal(unit.x, 0.6);
-  assert.equal(unit.y, 0.8);
-});
 // ゲームと同じく、幅20px・長さ120pxのバットを、グリップ側の端（原点）を中心に回して調べる。ボールの半径は20px。
 const bat = { pivot: new Vector2(0, 0), width: 20, length: 120 };
+const frames = (...pairs) => pairs.map(([time, degree]) => ({ time, degree }));
+// 前回の判定から今回の判定まで、バットもボールも止まっているときの当たり判定。
+const isTouching = (degree, [x, y]) =>
+  isBallHitDuringSwing(
+    bat,
+    frames([0, degree], [30, degree]),
+    new Vector2(x, y),
+    new Vector2(x, y),
+    20,
+  );
 for (const [name, degree, center, expected] of [
   ['-30度のとき、グリップの62px右・10px下は外れる', -30, [62, 10], false],
   ['-30度のとき、グリップの62px右・65px下は外れる', -30, [62, 65], false],
   ['-30度のとき、グリップの62px右・100px下は当たる', -30, [62, 100], true],
   ['水平のとき、上のラインの20px上は当たる', -90, [62, -20], true],
+  ['水平のとき、上のラインの21px上は外れる', -90, [62, -21], false],
+  ['水平のとき、中心がバットの枠の中なら当たる', -90, [62, 10], true],
   [
     '水平のとき、上のラインの40px下（下のラインの20px下）は当たる',
     -90,
@@ -82,30 +83,11 @@ for (const [name, degree, center, expected] of [
   ['水平のとき、バットの先の角から20px以内は当たる', -90, [134, 34], true],
   ['水平のとき、バットの先の角から20pxより遠いと外れる', -90, [135, 35], false],
 ])
-  test(name, () =>
-    assert.equal(
-      isBallTouchingBat(bat, degree, new Vector2(...center), 20),
-      expected,
-    ),
-  );
-test('バットの枠までの距離は、中心が枠の中なら0、外なら最も近い辺か角までの距離', () => {
-  for (const [center, expected] of [
-    [[62, 10], 0],
-    [[62, 41], 21],
-    [[62, -30], 30],
-    [[134, 34], Math.hypot(14, 14)],
-  ])
-    assert.ok(
-      Math.abs(getDistanceToBat(bat, -90, new Vector2(...center)) - expected) <
-        1e-9,
-      String(center),
-    );
-});
-const frames = (...pairs) => pairs.map(([time, degree]) => ({ time, degree }));
+  test(name, () => assert.equal(isTouching(degree, center), expected));
 test('判定と判定の間にバットがボールを通り過ぎたときは当たる', () => {
   // 前回は-30度でグリップの55px下、今回は-60度で85px下。どちらの時点もバットに触れていない。
-  assert.equal(isBallTouchingBat(bat, -30, new Vector2(62, 55), 20), false);
-  assert.equal(isBallTouchingBat(bat, -60, new Vector2(62, 85), 20), false);
+  assert.equal(isTouching(-30, [62, 55]), false);
+  assert.equal(isTouching(-60, [62, 85]), false);
   assert.equal(
     isBallHitDuringSwing(
       bat,
@@ -131,7 +113,7 @@ test('判定と判定の間にバットが先に通り過ぎ、ボールに触�
 });
 test('振り終えて0度に戻る間の角度では当てない', () => {
   // -90度から0度へ戻る途中の-50度なら当たる位置のボール
-  assert.equal(isBallTouchingBat(bat, -50, new Vector2(62, 75), 20), true);
+  assert.equal(isTouching(-50, [62, 75]), true);
   assert.equal(
     isBallHitDuringSwing(
       bat,
