@@ -348,7 +348,6 @@ function screen({
       },
       './process': {},
       './appConfig': { boardItems: [], guestImagePath: 'guest.png' },
-      'regenerator-runtime/runtime.js': {},
     },
     {
       window: {
@@ -531,7 +530,6 @@ function auth() {
   };
   const { FirebaseAuth } = load('src/application/firebase/auth.js', {
     'firebase/auth': sdk,
-    'regenerator-runtime/runtime.js': {},
   });
   return {
     handler: new FirebaseAuth(),
