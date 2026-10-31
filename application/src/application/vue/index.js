@@ -88,7 +88,6 @@ export const createVueInstance = () => {
           ? 'ログインして開始'
           : `${this.loginUserName}として開始`;
       },
-      // 画面側で使用しており、asyncとすると表示が上手くいかないため同期メソッドとしている
       isSelectingModeShownComputed() {
         return !(this.shouldShowInitImage || this.shouldShowResult);
       },
@@ -399,8 +398,7 @@ export const createVueInstance = () => {
           this.clearThrowingBall();
 
           if (this.outCount >= 3) {
-            // ゲームセット後、一定時間はゲーム画面をそのまま表示する
-            // 3アウト後にいきなり結果表示画面に移るとびっくりするため
+            // 3アウトの直後に結果画面へ切り替えると唐突なため、ゲーム画面のまま「ゲームセット」を表示してから結果画面に移る。
             setTimeout(() => {
               this.resultMessage = getResultMessage(this.point);
               this.message = 'ゲームセット';
@@ -481,8 +479,8 @@ export const createVueInstance = () => {
               ballPosition.left + this.ballRadiusComputed,
               ballPosition.top + this.ballRadiusComputed,
             );
-            // 当たった時はボールを跳ね返す
-            // 2度打ち防止のため、既にボールが跳ね返っているときはスルー
+            // バットに当たったらボールを跳ね返す。
+            // 2度打ちにならないよう、跳ね返った後のボールはバットとの当たり判定をしない。
             const isHitToBat =
               yBallIncrement >= 0 &&
               isBallHitDuringSwing(
@@ -502,8 +500,8 @@ export const createVueInstance = () => {
               return;
             }
 
-            // iOS系の端末でボールの座標を検知できない時があるため、座標がセットされていなければ投げ直しとする
-            // TODO:どういうわけかバットとの当たり判定前にこのチェックを行うと検知できないエラーが発生するため、バットとの当たり判定後にチェックしている
+            // iOSの端末でボールの座標を取得できないことがあるため、座標がすべて0なら投げ直す。
+            // TODO: 原因は分かっていないが、このチェックをバットとの当たり判定より前に行うと検知できないエラーが起きるため、当たり判定の後に行っている。
             const shouldReThrow =
               ballPosition.x === 0 &&
               ballPosition.y === 0 &&
