@@ -15,7 +15,7 @@ import {
 import { getApp } from 'firebase/app';
 
 /**
- * firestoreのランキングコレクションのカラム
+ * ランキングのドキュメントが持つフィールドの名前
  */
 export class FireStoreColumn {
   static userId = 'userId';
@@ -138,7 +138,7 @@ export class FireStore {
       [FireStoreColumn.lastUpdated]: new Date(),
     };
 
-    // 本来同じユーザの歴代記録は残したいところだが、自分が何度もプレーしているのがばれたくないため記録は上書きする
+    // 同じプレイヤーが何度遊んだかを他の人に知られないよう、記録は1人1件にして上書きする。
     await setDoc(
       doc(this._firestore, this._collection, documentId),
       targetData,
