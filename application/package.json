@@ -43,6 +43,6 @@
     "node": "24.x"
   },
   "resolutions": {
-    "**/@grpc/grpc-js": "1.14.5"
+    "**/@grpc/grpc-js": "1.14.6"
   }
 }
