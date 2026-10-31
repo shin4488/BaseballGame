@@ -5,7 +5,6 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import 'regenerator-runtime/runtime.js';
 
 export class FirebaseAuth {
   /**

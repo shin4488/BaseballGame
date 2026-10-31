@@ -8,7 +8,6 @@ import {
   getRandomNumber,
 } from './process';
 import { boardItems, guestImagePath } from './appConfig';
-import 'regenerator-runtime/runtime.js';
 
 export const createVueInstance = () => {
   let guestCreation = null;

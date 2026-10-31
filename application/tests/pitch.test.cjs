@@ -94,7 +94,6 @@ function fixture(
         { Math: math },
       ),
       './appConfig': { boardItems: [] },
-      'regenerator-runtime/runtime.js': {},
     },
     {
       window: { document: doc, Promise },

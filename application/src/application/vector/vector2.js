@@ -25,16 +25,7 @@ export default class Vector2 {
     return Math.sqrt(x ** 2 + y ** 2);
   }
 
-  get normarized() {
-    const { x, y } = this;
-    return new Vector2(x / this.magnitude, y / this.magnitude);
-  }
-
   static dot(v0, v1) {
     return v0.x * v1.x + v0.y * v1.y;
-  }
-
-  static cross(v0, v1) {
-    return v0.x * v1.y - v0.y * v1.x;
   }
 }
