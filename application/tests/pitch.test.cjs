@@ -25,9 +25,6 @@ function load(file, dependencies = {}, globals = {}) {
   return exports;
 }
 const vector = load('src/application/vector/vector2.js');
-const processModule = load('src/application/vue/process.js', {
-  '../vector/vector2': vector,
-});
 const rect = (left, top, width, height) => ({
   left,
   top,
@@ -211,6 +208,51 @@ test('的の隙間を抜ける打球はアウト', async () => {
   assert.equal(app.point, 0);
   assert.equal(app.outCount, 1);
 });
+// 的は左端100px・下端40px。半径20pxのボールは、中心が左端から20px左を通ると的の左下の角に触れる。
+for (const [name, x, point, out] of [
+  ['的の左端から20px左を中心が通る打球は、的の角に触れて得点する', 80, 4, 0],
+  ['的の左端から21px左を中心が通る打球は、的に触れずアウト', 79, 0, 1],
+])
+  test(name, async () => {
+    const app = await play([
+      [
+        { x, y: 90 },
+        { x, y: 0 },
+      ],
+    ]);
+    assert.equal(app.point, point);
+    assert.equal(app.outCount, out);
+  });
+test('画面の左端の的に触れた打球は、同じ判定の間に画面の端へ出てもファールにしない', async () => {
+  // ボールの上端は的の下端に触れるが、中心は的の下端まで届かないうちに、ボールの左端が画面の左端を越える。
+  const app = await play(
+    [
+      [
+        { x: 40, y: 90 },
+        { x: 15, y: 55 },
+      ],
+    ],
+    [{ left: 0, point: 4, out: 0 }],
+  );
+  assert.equal(app.point, 4);
+  assert.equal(app.strikeCount, 0);
+});
+test('投げたボールは的に重なっても得点せず、そのまま投球を続ける', async () => {
+  const f = fixture();
+  f.bat = { left: 600, top: 500 };
+  // 的の下端にかかる位置から、下へ向かって投げる。
+  f.center = { x: 170, y: 25 };
+  await f.startFirstPitch();
+  await f.advance(30);
+  f.center = { x: 170, y: 50 };
+  await f.advance(30);
+  assert.equal(f.app.point, 0);
+  assert.equal(f.app.outCount, 0);
+  f.center = strikeZone;
+  await f.advance(30);
+  assert.equal(f.app.strikeCount, 1);
+  assert.equal(f.app.point, 0);
+});
 test('隣接した的ではDOMの順序でなく先に触れた的を採用する', async () => {
   const app = await play(
     [
@@ -303,22 +345,6 @@ test('速度10〜30pxと各開始位置の420通りで、的の中央への命�
     }
   assert.equal(cases, 420);
 });
-for (const [name, previous, current, expected] of [
-  ['下面の中央に最初に触れる', { x: 170, y: 90 }, { x: 170, y: 0 }, 1 / 3],
-  ['端点への接線も命中する', { x: 80, y: 90 }, { x: 80, y: 0 }, 5 / 9],
-  ['端点の半径より外は命中しない', { x: 79, y: 90 }, { x: 79, y: 0 }, null],
-  ['投球方向では命中しない', { x: 170, y: 0 }, { x: 170, y: 90 }, null],
-  ['静止したボールを再加点しない', { x: 170, y: 40 }, { x: 170, y: 40 }, null],
-])
-  test(name, () => {
-    const actual = processModule.getBoardHitTime(previous, current, 20, {
-      left: 100,
-      right: 250,
-      bottom: 40,
-    });
-    if (expected === null) assert.equal(actual, null);
-    else assert.ok(Math.abs(actual - expected) < 1e-10);
-  });
 for (const [strikes, message, expectedStrikes, expectedOuts] of [
   [0, 'ストライク', 1, 0],
   [1, 'ストライク', 2, 0],

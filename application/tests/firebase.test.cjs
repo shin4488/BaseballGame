@@ -315,7 +315,15 @@ test('初回の既存IDが不正な場合は1からやり直さず失敗する',
 });
 
 // 開始画面。ランキングとゲスト番号の取得先を差し替え、ゲームの投球は始めない。
-function screen({ guestStore, rankings = {}, loginUserName = null } = {}) {
+// firestoreにdatabase()を渡すと、ランキングの取得・削除にメモリ内のFirestoreを使う。
+function screen({
+  guestStore,
+  rankings = {},
+  loginUserName = null,
+  loginUserId = null,
+  firestore,
+  confirm,
+} = {}) {
   const { createVueInstance } = load(
     'src/application/vue/index.js',
     {
@@ -324,13 +332,13 @@ function screen({ guestStore, rankings = {}, loginUserName = null } = {}) {
         FirebaseAuthExtention: {
           auth: {
             getLoginUserName: () => loginUserName,
-            getLoginUserId: () => null,
+            getLoginUserId: () => loginUserId,
             signOutFromGoogle: async () => {},
           },
         },
       },
       '../firebase/database': {
-        FireStoreExtention: {
+        FireStoreExtention: firestore?.FireStoreExtention ?? {
           guestStore,
           getRankingHistory: async () => [],
           getRankingThisWeek: async () => [],
@@ -346,6 +354,7 @@ function screen({ guestStore, rankings = {}, loginUserName = null } = {}) {
       window: {
         document: { documentElement: { clientWidth: 390, clientHeight: 844 } },
         addEventListener: () => {},
+        confirm,
       },
       Vue: function (options) {
         return options;
@@ -803,4 +812,64 @@ test('ログイン済みの開始画面ではゲスト番号を発行しない',
   assert.equal(app.loginUserName, '山田');
   assert.equal(calls, 0);
   assert.equal(app.isPreparingGuest, false);
+});
+
+// 開始画面のランキングに表示している記録のIDと、そのうち削除ボタンを表示する記録のID
+const shownIds = (app, key) =>
+  [...app.rankings[key].dataList].map((row) => row.playerId);
+const deletableIds = (app, key) =>
+  [...app.rankings[key].dataList]
+    .filter((row) => row.isLoginUser)
+    .map((row) => row.playerId);
+test('ランキングで削除できるのは、ログインユーザー自身の記録だけ', async () => {
+  const d = database({
+    guests: { 'guest-1': record('guest-1', 5) },
+    loginUsers: {
+      'user-1': record('user-1', 8),
+      'user-2': record('user-2', 3),
+    },
+  });
+  for (const [loginUserId, expected] of [
+    [null, []],
+    ['user-1', ['user-1']],
+  ]) {
+    const { app } = screen({ firestore: d, loginUserId });
+    await app.initializeTopMenuData();
+    assert.deepEqual(deletableIds(app, 'history'), expected);
+    assert.deepEqual(deletableIds(app, 'thisWeek'), expected);
+  }
+});
+test('自分の記録は、確認でOKを選んだときだけ削除してランキングを読み直す', async () => {
+  const d = database({
+    loginUsers: {
+      'user-1': record('user-1', 8),
+      'user-2': record('user-2', 3),
+    },
+  });
+  const messages = [];
+  let answer = false;
+  const { app } = screen({
+    firestore: d,
+    loginUserId: 'user-1',
+    confirm: (message) => {
+      messages.push(message);
+      return answer;
+    },
+  });
+  await app.initializeTopMenuData();
+  const own = app.rankings.history.dataList.find((row) => row.isLoginUser);
+  await app.onClickRecordDeleteButton(own);
+  // 確認では、削除する記録の得点とプレイ日を示す。
+  assert.match(messages[0], /得点：8/);
+  assert.match(messages[0], /プレイ日：2026\/10\/15/);
+  assert.deepEqual(Object.keys(d.data('loginUsers')).sort(), [
+    'user-1',
+    'user-2',
+  ]);
+  answer = true;
+  await app.onClickRecordDeleteButton(own);
+  await flush();
+  assert.deepEqual(Object.keys(d.data('loginUsers')), ['user-2']);
+  assert.deepEqual(shownIds(app, 'history'), ['user-2']);
+  assert.deepEqual(shownIds(app, 'thisWeek'), ['user-2']);
 });
