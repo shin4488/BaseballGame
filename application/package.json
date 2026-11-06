@@ -14,7 +14,7 @@
     "format:check": "prettier --check --ignore-path ../.gitignore ."
   },
   "devDependencies": {
-    "@babel/core": "^8.0.7",
+    "@babel/core": "^8.0.10",
     "@babel/preset-env": "^8.0.7",
     "@eslint/js": "^10.0.1",
     "babel-loader": "^10.1.1",
@@ -27,8 +27,8 @@
     "gulp-mode": "^1.1.0",
     "gulp-sass": "6.0.1",
     "prettier": "^3.9.10",
-    "sass": "1.106.1",
-    "webpack": "^5.112.0",
+    "sass": "1.107.0",
+    "webpack": "^5.112.2",
     "webpack-cli": "^7.2.3",
     "webpack-dev-server": "6.1.0",
     "webpack-stream": "7.0.0"
